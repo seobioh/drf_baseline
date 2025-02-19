@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'corsheaders',                  # CORS
 
     # My apps
+    'accounts',
 ]
 
 REST_FRAMEWORK = {
@@ -121,6 +122,7 @@ DATABASES = {
     }
 }
 
+AUTH_USER_MODEL = 'accounts.User'
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

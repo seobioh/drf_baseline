@@ -13,8 +13,10 @@ It includes pre-configured dotenv, JWT, CORS, static files and Dockerfile.
 3. add SECRET_KEY = 'your_secret_key'.
 4. (optional) run '$ python manage.py collectstatic' for static file collection.
 5. install dependencies writen on Dockerfile.
-6. run 'python manage.py runserver' for development server.
-7. run 'python manage.py runserver --settings=server.settings.deploy' for deployment server.
+6. run 'python manage.py makemigrations'
+7. run 'python manage.py migrate'
+8. run 'python manage.py runserver' for development server.
+9. run 'python manage.py runserver --settings=server.settings.deploy' for deployment server.
 
 
 ## 📌 DRF Baseline Structure
