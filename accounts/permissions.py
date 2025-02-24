@@ -1,10 +1,9 @@
 # accounts/permissions.py
 app_name = 'accounts'
 
-from rest_framework import permissions
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
 
-class IsStaff(permissions.BasePermission):
+class IsStaff(BasePermission):
     def has_permission(self, request, view):
         # Verify if request is POST or PUT or DELETE.
         if request.method in ['POST', 'PUT', 'DELETE']:
