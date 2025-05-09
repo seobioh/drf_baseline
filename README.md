@@ -10,7 +10,14 @@ It includes pre-configured dotenv, JWT, CORS, static files and Dockerfile.
 
 1. clone current project.
 2. add '.env' file on '/server'.
-3. add SECRET_KEY = 'your_secret_key'.
+3. .env file should look like this
+```env
+SECRET_KEY = 'your_secret_key'.
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = '587'
+EMAIL_HOST_USER = 'example@gmail.com'
+EMAIL_HOST_PASSWORD = 'your_secret_key'
+```
 4. (optional) run '$ python manage.py collectstatic' for static file collection.
 5. install dependencies writen on Dockerfile.
 6. run 'python manage.py makemigrations'
@@ -51,12 +58,14 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'server.settings.dev')
 ### server/settings/base.py
 
 1. dotenv
+```env
 import os, dotenv
 dotenv.load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
-
+```
 
 2. JWT
+```python
 from datetime import timedelta
 INSTALLED_APPS = ['rest_framework_simplejwt']
 REST_FRAMEWORK = {
@@ -93,32 +102,37 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
-
+```
 
 3. CORS
+```python
 INSTALLED_APPS = ['corsheaders']
 MIDDLEWARE = ['corsheaders.middleware.CorsMiddleware']
-
+```
 
 4. Static files
+```python
 import os
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 run '$ python manage.py collectstatic'
-
+```
 
 
 ### server/settings/dev.py
 
+```python
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
 WSGI_APPLICATION = 'appserver.wsgi.dev.application'
-
+```
 
 
 ### server/settings/deploy.py
 
+```python
 DEBUG = False
 ALLOWED_HOSTS = ['*']
 CORS_ALLOWED_ORIGINS = ['http://localhost:8000']
 WSGI_APPLICATION = 'appserver.wsgi.deploy.application'
+```
