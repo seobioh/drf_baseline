@@ -51,7 +51,6 @@ It supports `.env` configuration, JWT authentication, CORS setup, static file ha
 
 ---
 
-
 ## 🗂 Project Structure
 
 ```text
@@ -77,7 +76,6 @@ It supports `.env` configuration, JWT authentication, CORS setup, static file ha
 
 ---
 
-
 ## 🛠️ Configuration Details
 
 ### 📄 manage.py
@@ -87,7 +85,6 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'server.settings.dev')
 ```
 
 ---
-
 
 ### ⚙️ server/settings/base.py
 
@@ -151,7 +148,6 @@ STATIC_ROOT = os.path.join(BASE_DIR, "static")
 run '$ python manage.py collectstatic'
 ```
 
-
 ---
 
 ### 🧪 server/settings/dev.py
@@ -162,7 +158,6 @@ ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
 WSGI_APPLICATION = 'appserver.wsgi.dev.application'
 ```
-
 
 ---
 
