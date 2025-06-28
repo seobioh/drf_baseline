@@ -5,6 +5,8 @@ It provides a structured environment with separate configurations for **developm
 
 It includes pre-configured dotenv, JWT, CORS, static files and Dockerfile.
 
+---
+
 
 ## 📌 How to Use
 
@@ -16,45 +18,38 @@ It includes pre-configured dotenv, JWT, CORS, static files and Dockerfile.
 6. run 'python manage.py runserver' for development server.
 7. run 'python manage.py runserver --settings=server.settings.deploy' for deployment server.
 
+---
+
 
 ## 📌 DRF Baseline Structure
 
-├──server
-│   ├── .env
-│   ├── settings
-│   │   ├── base.py
-│   │   ├── deploy.py
-│   │   └── dev.py
-│   ├── wsgi
-│   │   ├── deploy.py
-│   │   └── dev.py
-│   ├── asgi.py
-│   ├── static
-│   ├── db.sqlite3
-│   └── urls.py
-├── .gitignore
-├── Dockerfile
-├── README.md
-└── manage.py
+<pre><code>```text ## 📌 DRF Baseline Structure ├── server │ ├── .env │ ├── settings │ │ ├── base.py │ │ ├── deploy.py │ │ └── dev.py │ ├── wsgi │ │ ├── deploy.py │ │ └── dev.py │ ├── asgi.py │ ├── static │ ├── db.sqlite3 │ └── urls.py ├── .gitignore ├── Dockerfile ├── requirements.txt ├── README.md └── manage.py ``` </code></pre>
+
+---
 
 
 ## 📌 DRF Baseline Detail
 
 ### manage.py
-
+```python
 default environment : server.settings.dev
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'server.settings.dev')
+```
+
+---
 
 
 ### server/settings/base.py
 
 1. dotenv
+```env
 import os, dotenv
 dotenv.load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
-
+```
 
 2. JWT
+```python
 from datetime import timedelta
 INSTALLED_APPS = ['rest_framework_simplejwt']
 REST_FRAMEWORK = {
@@ -91,32 +86,37 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
-
+```
 
 3. CORS
+```python
 INSTALLED_APPS = ['corsheaders']
 MIDDLEWARE = ['corsheaders.middleware.CorsMiddleware']
-
+```
 
 4. Static files
+```python
 import os
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 run '$ python manage.py collectstatic'
-
+```
 
 
 ### server/settings/dev.py
 
+```python
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
 WSGI_APPLICATION = 'appserver.wsgi.dev.application'
-
+```
 
 
 ### server/settings/deploy.py
 
+```python
 DEBUG = False
 ALLOWED_HOSTS = ['*']
 CORS_ALLOWED_ORIGINS = ['http://localhost:8000']
 WSGI_APPLICATION = 'appserver.wsgi.deploy.application'
+```
