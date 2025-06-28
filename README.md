@@ -23,7 +23,26 @@ It includes pre-configured dotenv, JWT, CORS, static files and Dockerfile.
 
 ## 📌 DRF Baseline Structure
 
-<pre><code>```text ## 📌 DRF Baseline Structure ├── server │ ├── .env │ ├── settings │ │ ├── base.py │ │ ├── deploy.py │ │ └── dev.py │ ├── wsgi │ │ ├── deploy.py │ │ └── dev.py │ ├── asgi.py │ ├── static │ ├── db.sqlite3 │ └── urls.py ├── .gitignore ├── Dockerfile ├── requirements.txt ├── README.md └── manage.py ``` </code></pre>
+```text
+├── server
+│   ├── .env
+│   ├── settings
+│   │   ├── base.py
+│   │   ├── deploy.py
+│   │   └── dev.py
+│   ├── wsgi
+│   │   ├── deploy.py
+│   │   └── dev.py
+│   ├── asgi.py
+│   ├── static
+│   ├── db.sqlite3
+│   └── urls.py
+├── .gitignore
+├── Dockerfile
+├── requirements.txt
+├── README.md
+└── manage.py
+```
 
 ---
 
