@@ -25,11 +25,11 @@ It supports `.env` configuration, JWT authentication, CORS setup, static file ha
    ```
 2. **Add a '.env' file in '/server'**.
    ```env
-   SECRET_KEY='your_secret_key'
-   EMAIL_HOST='smtp.gmail.com'
-   EMAIL_PORT='587'
-   EMAIL_HOST_USER='example@gmail.com'
-   EMAIL_HOST_PASSWORD='your_email_password'
+   SECRET_KEY = 'your_secret_key'
+   EMAIL_HOST = 'smtp.gmail.com'
+   EMAIL_PORT = '587'
+   EMAIL_HOST_USER = 'example@gmail.com'
+   EMAIL_HOST_PASSWORD = 'your_email_password'
    ```
 3. **(Optional)** Collect static files.
    ```bash
