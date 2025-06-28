@@ -24,10 +24,18 @@ from .permissions import IsAuthenticated, AllowAny
 class SignUpAPIView(APIView):
     def post(self, request):
         # Check if the email is already registered
-        if User.objects.filter(email=request.data["email"]).exists():
+        if User.objects.filter(email=request.data.get("email")).exists():
             response_error = {
                 "code": 1,
                 "message": "Email already exists.",
+            }
+            return Response(response_error, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if the mobile number is already registered
+        if User.objects.filter(mobile=request.data.get("mobile")).exists():
+            response_error = {
+                "code": 1,
+                "message": "Mobile number already exists.",
             }
             return Response(response_error, status=status.HTTP_400_BAD_REQUEST)
 
@@ -57,7 +65,7 @@ class SignUpAPIView(APIView):
                 "code": 1,
                 "message": "Signup failed",
                 "errors": serializer.errors,
-            },       
+            }
             return Response(response_error, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -69,40 +77,30 @@ class TokenRefreshAPIView(APIView):
 
         try: 
             serializer.is_valid(raise_exception=True)
+            access_token = serializer.validated_data["access"]
+            access_token_lifetime = api_settings.ACCESS_TOKEN_LIFETIME.total_seconds()
+
+            token_obj = RefreshToken(refresh_token)
+            user_id = token_obj["user_id"]
+            user = User.objects.get(id=user_id)
+            user.last_access = now()
+            user.save(update_fields=["last_access"])
+            
+            response = {
+                "code": 0,
+                "access_token": access_token,
+                "expires_in": access_token_lifetime
+            }
+            return Response(response, status=status.HTTP_200_OK)
 
         except TokenError as error:
             response_error = {
                 "code": 1,
                 "message": "Authentication failed",
                 "errors": str(error),
-            },       
+            }
             return Response(response_error, status=status.HTTP_401_UNAUTHORIZED)
-        
-        access_token = serializer.validated_data["access"]
-        access_token_lifetime = api_settings.ACCESS_TOKEN_LIFETIME.total_seconds()
-
-        try:
-            token_obj = RefreshToken(refresh_token)
-            user_id = token_obj["user_id"]
-            user = User.objects.get(id=user_id)
-            user.last_login = now()
-            user.save(update_fields=["last_login"])
-
-        except Exception as error:
-            response_error = {
-                "code": 1,
-                "message": "Authentication failed",
-                "errors": str(error),
-            },       
-            return Response(response_error, status=status.HTTP_401_UNAUTHORIZED)
-
-        response = {
-            "code": 0,
-            "access_token": access_token,
-            "expires_in": access_token_lifetime
-        }
-        return Response(response, status=status.HTTP_200_OK)
-
+    
 
 # Account Management API (Login, Fetch Info, Update, Delete)
 class AccountAPIView(APIView):
@@ -123,9 +121,9 @@ class AccountAPIView(APIView):
         access_token = str(token.access_token)
         expires_in = token.access_token.lifetime.total_seconds()
 
-        # Update last login time
-        user.last_login = now()
-        user.save(update_fields=["last_login"])
+        # Update last access time
+        user.last_access = now()
+        user.save(update_fields=["last_access"])
 
         response = {
             "code": 0,
@@ -150,8 +148,8 @@ class AccountAPIView(APIView):
             expires_in = token.access_token.lifetime.total_seconds()
 
             # Update last login time
-            user.last_login = now()
-            user.save(update_fields=["last_login"])
+            user.last_access = now()
+            user.save(update_fields=["last_access"])
 
             response = {
                 "code": 0,
@@ -169,8 +167,8 @@ class AccountAPIView(APIView):
             response_error = {
                 "code": 1,
                 "message": "Invalid credentials. Please try again.",
-                "errors": serializer.errors,
-            },       
+                "errors": {"non_field_errors": ["Invalid email or password."]},
+            }     
             return Response(response_error, status=status.HTTP_400_BAD_REQUEST)
         
     # Delete Account API
@@ -189,7 +187,7 @@ class AccountAPIView(APIView):
         user = request.user  # Authenticated user
         serializer = UserSerializer(instance=user, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save(last_login=now())
+            serializer.save(last_access=now())
             updated_user = serializer.data
 
             response = {
@@ -204,7 +202,7 @@ class AccountAPIView(APIView):
                 "code": 1,
                 "message": "Validation failed",
                 "errors": serializer.errors,
-            },       
+            }     
             return Response(response_error, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -249,7 +247,7 @@ class SendVerificationCodeAPIView(APIView):
                 "code": 1,
                 "message": "Verification code sending failed",
                 "errors": str(error),
-            },       
+            }   
             return Response(response_error, status=status.HTTP_401_UNAUTHORIZED)
 
         response = {

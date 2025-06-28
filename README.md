@@ -33,6 +33,7 @@ EMAIL_HOST_PASSWORD = 'your_secret_key'
 ## 📌 DRF Baseline Structure
 
 ```text
+├── accounts
 ├── server
 │   ├── .env
 │   ├── settings
@@ -52,6 +53,32 @@ EMAIL_HOST_PASSWORD = 'your_secret_key'
 ├── README.md
 └── manage.py
 ```
+
+---
+
+
+## 📌 DRF Baseline Accounts App Data Structure
+
+Accounts application is designed base on this table. Use it to modify your own data structure.
+
+| Field         | Type    | Unique | Null  | Blank | Default       | Auto Add |
+|---------------|---------|--------|-------|-------|---------------|----------|
+| id            | int     | PK     |       |       |               |          |
+| email         | email   | TRUE   |       |       |               |          |
+| mobile        | char    | TRUE   |       |       |               |          |
+| password      |         |        |       |       |               |          |
+| name          | char    |        |       |       |               |          |
+| username      | char    | TRUE   | FALSE | TRUE  |               | TRUE     |
+| profile_image |         |        | TRUE  | TRUE  |               |          |
+| birthday      |         |        | TRUE  | TRUE  |               |          |
+| gender        |         |        | TRUE  | TRUE  |               |          |
+| created_at    | date    |        |       |       |               | TRUE     |
+| modified_at   | date    |        |       |       |               | TRUE     |
+| last_access   | date    |        |       |       |               | TRUE     |
+| is_active     | bool    |        |       |       | TRUE          |          |
+| is_business   | bool    |        |       |       | FALSE         |          |
+| is_staff      | bool    |        |       |       | FALSE         |          |
+| is_admin      | bool    |        |       |       | FALSE         |          |
 
 ---
 
