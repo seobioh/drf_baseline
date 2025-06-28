@@ -1,3 +1,5 @@
+redis
+celery
 gunicorn
 python-dotenv
 djangorestframework
