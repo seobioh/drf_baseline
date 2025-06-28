@@ -1,27 +1,58 @@
-# DRF Baseline
+# 🚀 DRF Baseline
 
-**DRF Baseline** is a Django REST Framework (DRF) boilerplate designed to help you quickly set up and start a new DRF project.  
-It provides a structured environment with separate configurations for **development** and **deployment**, ensuring a smooth transition from local testing to production.
+**DRF Baseline** is a Django REST Framework boilerplate that helps you quickly set up a clean, scalable backend for your next project.  
+It supports `.env` configuration, JWT authentication, CORS setup, static file handling, and production-ready deployment structure.
 
-It includes pre-configured dotenv, JWT, CORS, static files and Dockerfile.
+---
+
+## 📦 Features
+
+- ✅ Django REST Framework
+- 🔐 JWT Authentication (SimpleJWT)
+- ⚙️ Environment-based settings (`dev` / `deploy`)
+- 🌐 CORS support
+- 📁 Static file configuration
+- 🐳 Dockerfile included
+
+---
+
+## 📌 Getting Started
+
+1. **Clone the project**
+   ```bash
+   git clone https://github.com/your-username/drf_baseline.git
+   ```
+2. **Add a '.env' file in '/server'**.
+   ```env
+   SECRET_KEY='your_secret_key'
+   ```
+3. **(Optional)** Collect static files.
+   ```bash
+   python manage.py collectstatic
+   ```
+4. **Install dependencies**
+   Make sure to use a virtual environment:
+   ```bash
+   pip install -r requirements.txt
+   ```
+5. **Apply migrations**
+   ```bash
+   python manage.py makemigrations
+   python manage.py migrate
+   ```
+6. **Run development server**
+   ```bash
+   python manage.py runserver
+   ```
+7. **Run deployment server**
+   ```bash
+   python manage.py runserver --settings=server.settings.deploy
+   ```
 
 ---
 
 
-## 📌 How to Use
-
-1. clone current project.
-2. add '.env' file on '/server'.
-3. add SECRET_KEY = 'your_secret_key'.
-4. (optional) run '$ python manage.py collectstatic' for static file collection.
-5. install dependencies writen on Dockerfile.
-6. run 'python manage.py runserver' for development server.
-7. run 'python manage.py runserver --settings=server.settings.deploy' for deployment server.
-
----
-
-
-## 📌 DRF Baseline Structure
+## 🗂 Project Structure
 
 ```text
 ├── server
@@ -47,9 +78,9 @@ It includes pre-configured dotenv, JWT, CORS, static files and Dockerfile.
 ---
 
 
-## 📌 DRF Baseline Detail
+## 🛠️ Configuration Details
 
-### manage.py
+### 📄 manage.py
 ```python
 default environment : server.settings.dev
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'server.settings.dev')
@@ -58,16 +89,16 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'server.settings.dev')
 ---
 
 
-### server/settings/base.py
+### ⚙️ server/settings/base.py
 
-1. dotenv
+1. **dotenv**
 ```env
 import os, dotenv
 dotenv.load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
 ```
 
-2. JWT
+2. **JWT**
 ```python
 from datetime import timedelta
 INSTALLED_APPS = ['rest_framework_simplejwt']
@@ -107,13 +138,13 @@ SIMPLE_JWT = {
 }
 ```
 
-3. CORS
+3. **CORS**
 ```python
 INSTALLED_APPS = ['corsheaders']
 MIDDLEWARE = ['corsheaders.middleware.CorsMiddleware']
 ```
 
-4. Static files
+4. **Static files**
 ```python
 import os
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
@@ -121,7 +152,7 @@ run '$ python manage.py collectstatic'
 ```
 
 
-### server/settings/dev.py
+### 🧪 server/settings/dev.py
 
 ```python
 DEBUG = True
@@ -131,7 +162,7 @@ WSGI_APPLICATION = 'appserver.wsgi.dev.application'
 ```
 
 
-### server/settings/deploy.py
+### 🚀 server/settings/deploy.py
 
 ```python
 DEBUG = False
