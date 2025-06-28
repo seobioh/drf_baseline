@@ -11,10 +11,10 @@ from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 
-from django.core.mail import send_mail
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
 
+from .task import send_verification_email
 from .models import User, EmailVerification
 from .serializers import UserSerializer, EmailVerificationSerializer
 from .permissions import IsAuthenticated, AllowAny
@@ -206,6 +206,7 @@ class AccountAPIView(APIView):
             return Response(response_error, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Verification Code API
 class SendVerificationCodeAPIView(APIView):
     def post(self, request):
         email = request.data.get('email')
@@ -233,22 +234,7 @@ class SendVerificationCodeAPIView(APIView):
             defaults={'code': code, 'created_at': now()}
         )
 
-        try: 
-            send_mail(
-                subject='Your Verification Code',
-                message=f'Your verification code is: {code}',
-                from_email='your_email@gmail.com',
-                recipient_list=[email],
-                fail_silently=True,
-            )
-
-        except Exception as error:
-            response_error = {
-                "code": 1,
-                "message": "Verification code sending failed",
-                "errors": str(error),
-            }   
-            return Response(response_error, status=status.HTTP_401_UNAUTHORIZED)
+        send_verification_email(email, code)
 
         response = {
             "code": 0,
@@ -257,6 +243,7 @@ class SendVerificationCodeAPIView(APIView):
         return Response(response, status=status.HTTP_200_OK)
     
 
+# Verification Code API
 class VerifyCodeAPIView(APIView):
     def post(self, request):
         email = request.data.get("email")

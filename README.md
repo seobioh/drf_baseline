@@ -1,9 +1,7 @@
 # 🚀 DRF Baseline
 
-**DRF Baseline** is a Django REST Framework (DRF) boilerplate designed to help you quickly set up and start a new DRF project.  
-It provides a structured environment with separate configurations for **development** and **deployment**, ensuring a smooth transition from local testing to production.
-
-It includes pre-configured dotenv, JWT, CORS, static files and Dockerfile.
+**DRF Baseline** is a Django REST Framework boilerplate that helps you quickly set up a clean, scalable backend for your next project.  
+It supports `.env` configuration, JWT authentication, CORS setup, static file handling, and production-ready deployment structure.
 
 ---
 
@@ -76,7 +74,8 @@ To enable email queuing (e.g., for sending verification codes):
 ```text
 ├── accounts
 ├── server
-│   ├── .env
+│   ├── celery.py
+│   ├── __init__.py 
 │   ├── settings
 │   │   ├── base.py
 │   │   ├── deploy.py
@@ -87,6 +86,7 @@ To enable email queuing (e.g., for sending verification codes):
 │   ├── asgi.py
 │   ├── static
 │   ├── db.sqlite3
+│   ├── .env
 │   └── urls.py
 ├── .gitignore
 ├── Dockerfile
