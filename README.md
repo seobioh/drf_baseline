@@ -59,7 +59,7 @@ It supports `.env` configuration, JWT authentication, CORS setup, static file ha
 This project **does not** include Celery/Redis by default.
 To enable email queuing (e.g., for sending verification codes):
 1. Clone the extended version:
-👉 🔗 seobioh/server_baseline
+   👉 🔗 seobioh/server_baseline
    ```python
    send_verification_email(email, code)
    ```
@@ -74,8 +74,8 @@ To enable email queuing (e.g., for sending verification codes):
 ```text
 ├── accounts
 ├── server
-│   ├── celery.py
 │   ├── __init__.py 
+│   ├── celery.py
 │   ├── settings
 │   │   ├── base.py
 │   │   ├── deploy.py
