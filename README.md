@@ -5,6 +5,8 @@ It provides a structured environment with separate configurations for **developm
 
 It includes pre-configured dotenv, JWT, CORS, static files and Dockerfile.
 
+---
+
 
 ## 📌 How to Use
 
@@ -25,10 +27,13 @@ EMAIL_HOST_PASSWORD = 'your_secret_key'
 8. run 'python manage.py runserver' for development server.
 9. run 'python manage.py runserver --settings=server.settings.deploy' for deployment server.
 
+---
+
 
 ## 📌 DRF Baseline Structure
 
-├──server
+```text
+├── server
 │   ├── .env
 │   ├── settings
 │   │   ├── base.py
@@ -43,16 +48,23 @@ EMAIL_HOST_PASSWORD = 'your_secret_key'
 │   └── urls.py
 ├── .gitignore
 ├── Dockerfile
+├── requirements.txt
 ├── README.md
 └── manage.py
+```
+
+---
 
 
 ## 📌 DRF Baseline Detail
 
 ### manage.py
-
+```python
 default environment : server.settings.dev
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'server.settings.dev')
+```
+
+---
 
 
 ### server/settings/base.py
