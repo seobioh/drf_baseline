@@ -1,4 +1,4 @@
-# DRF Baseline
+# 🚀 DRF Baseline
 
 **DRF Baseline** is a Django REST Framework (DRF) boilerplate designed to help you quickly set up and start a new DRF project.  
 It provides a structured environment with separate configurations for **development** and **deployment**, ensuring a smooth transition from local testing to production.
@@ -7,30 +7,71 @@ It includes pre-configured dotenv, JWT, CORS, static files and Dockerfile.
 
 ---
 
+## 📦 Features
 
-## 📌 How to Use
+- ✅ Django REST Framework
+- 🔐 JWT Authentication (SimpleJWT)
+- ⚙️ Environment-based settings (`dev` / `deploy`)
+- 🌐 CORS support
+- 📁 Static file configuration
+- 🐳 Dockerfile included
+- 📧 Optional Celery + Redis integration for background tasks
 
-1. clone current project.
-2. add '.env' file on '/server'.
-3. .env file should look like this
-```env
-SECRET_KEY = 'your_secret_key'.
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = '587'
-EMAIL_HOST_USER = 'example@gmail.com'
-EMAIL_HOST_PASSWORD = 'your_secret_key'
-```
-4. (optional) run '$ python manage.py collectstatic' for static file collection.
-5. install dependencies writen on Dockerfile.
-6. run 'python manage.py makemigrations'
-7. run 'python manage.py migrate'
-8. run 'python manage.py runserver' for development server.
-9. run 'python manage.py runserver --settings=server.settings.deploy' for deployment server.
+## 📌 Getting Started
+
+1. **Clone the project**
+   ```bash
+   git clone https://github.com/your-username/drf_baseline.git
+   ```
+2. **Add a '.env' file in '/server'**.
+   ```env
+   SECRET_KEY='your_secret_key'
+   EMAIL_HOST='smtp.gmail.com'
+   EMAIL_PORT='587'
+   EMAIL_HOST_USER='example@gmail.com'
+   EMAIL_HOST_PASSWORD='your_email_password'
+   ```
+3. **(Optional)** Collect static files.
+   ```bash
+   python manage.py collectstatic
+   ```
+4. **Install dependencies**
+   Make sure to use a virtual environment:
+   ```bash
+   pip install -r requirements.txt
+   ```
+5. **Apply migrations**
+   ```bash
+   python manage.py makemigrations
+   python manage.py migrate
+   ```
+6. **Run development server**
+   ```bash
+   python manage.py runserver
+   ```
+7. **Run deployment server**
+   ```bash
+   python manage.py runserver --settings=server.settings.deploy
+   ```
 
 ---
 
+## ⚠️ Celery & Redis Integration (Optional)
 
-## 📌 DRF Baseline Structure
+This project **does not** include Celery/Redis by default.
+To enable email queuing (e.g., for sending verification codes):
+1. Clone the extended version:
+👉 🔗 seobioh/server_baseline
+   ```python
+   send_verification_email(email, code)
+   ```
+2. Replace:
+   ```python
+   send_verification_email.delay(email, code)
+   ```
+
+
+## 🗂 Project Structure
 
 ```text
 ├── accounts
@@ -57,9 +98,7 @@ EMAIL_HOST_PASSWORD = 'your_secret_key'
 ---
 
 
-## 📌 DRF Baseline Accounts App Data Structure
-
-Accounts application is designed base on this table. Use it to modify your own data structure.
+## 🧩 User Model Schema (Accounts App)
 
 | Field         | Type    | Unique | Null  | Blank | Default       | Auto Add |
 |---------------|---------|--------|-------|-------|---------------|----------|
@@ -83,9 +122,9 @@ Accounts application is designed base on this table. Use it to modify your own d
 ---
 
 
-## 📌 DRF Baseline Detail
+## 🛠️ Configuration Details
 
-### manage.py
+### 📄 manage.py
 ```python
 default environment : server.settings.dev
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'server.settings.dev')
@@ -94,16 +133,16 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'server.settings.dev')
 ---
 
 
-### server/settings/base.py
+### ⚙️ server/settings/base.py
 
-1. dotenv
+1. **dotenv**
 ```env
 import os, dotenv
 dotenv.load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
 ```
 
-2. JWT
+2. **JWT**
 ```python
 from datetime import timedelta
 INSTALLED_APPS = ['rest_framework_simplejwt']
@@ -143,13 +182,13 @@ SIMPLE_JWT = {
 }
 ```
 
-3. CORS
+3. **CORS**
 ```python
 INSTALLED_APPS = ['corsheaders']
 MIDDLEWARE = ['corsheaders.middleware.CorsMiddleware']
 ```
 
-4. Static files
+4. **Static files**
 ```python
 import os
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
@@ -157,7 +196,9 @@ run '$ python manage.py collectstatic'
 ```
 
 
-### server/settings/dev.py
+---
+
+### 🧪 server/settings/dev.py
 
 ```python
 DEBUG = True
@@ -167,7 +208,9 @@ WSGI_APPLICATION = 'appserver.wsgi.dev.application'
 ```
 
 
-### server/settings/deploy.py
+---
+
+### 🚀 server/settings/deploy.py
 
 ```python
 DEBUG = False
