@@ -152,6 +152,8 @@ run '$ python manage.py collectstatic'
 ```
 
 
+---
+
 ### 🧪 server/settings/dev.py
 
 ```python
@@ -161,6 +163,8 @@ CORS_ALLOW_ALL_ORIGINS = True
 WSGI_APPLICATION = 'appserver.wsgi.dev.application'
 ```
 
+
+---
 
 ### 🚀 server/settings/deploy.py
 
