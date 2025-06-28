@@ -56,7 +56,6 @@ It supports `.env` configuration, JWT authentication, CORS setup, static file ha
 
 ```text
 ├── server
-│   ├── .env
 │   ├── settings
 │   │   ├── base.py
 │   │   ├── deploy.py
@@ -67,6 +66,7 @@ It supports `.env` configuration, JWT authentication, CORS setup, static file ha
 │   ├── asgi.py
 │   ├── static
 │   ├── db.sqlite3
+│   ├── .env
 │   └── urls.py
 ├── .gitignore
 ├── Dockerfile
