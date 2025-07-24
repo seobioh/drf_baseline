@@ -14,9 +14,9 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, Toke
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
 
-from .task import send_verification_email
-from .models import User, EmailVerification
-from .serializers import UserSerializer, EmailVerificationSerializer
+from .task import send_verification_email, send_verification_sms
+from .models import User, Verification
+from .serializers import UserSerializer, VerificationCheckSerializer, VerificationRequestSerializer
 from .permissions import IsAuthenticated, AllowAny
 
 
@@ -206,76 +206,54 @@ class AccountAPIView(APIView):
             return Response(response_error, status=status.HTTP_400_BAD_REQUEST)
 
 
-# Verification Code API
-class SendVerificationCodeAPIView(APIView):
+# Send Verification Code API
+class SendVerificationView(APIView):
     def post(self, request):
-        email = request.data.get('email')
-        if not email:
-            response_error = {
-                "code": 1,
-                "message": "Email is required."
-            }
-            return Response(response_error, status=status.HTTP_400_BAD_REQUEST)
+        serializer = VerificationRequestSerializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
+            return Response({"code": 1, "message": "유효성 검사 실패", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        type = serializer.validated_data['type']
+        target = serializer.validated_data['target']
 
-        # Check if email already belongs to a registered user
-        if User.objects.filter(email=email).exists():
-            response_error = {
-                "code": 1,
-                "message": "Email already registered."
-            }
-            return Response(response_error, status=status.HTTP_400_BAD_REQUEST)
+        # 6 digits random code
+        code = f"{random.randint(0, 999999):06d}"
 
-        # Generate 6-digit code
-        code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-
-        # Check if a record already exists for the email
-        EmailVerification.objects.update_or_create(
-            email=email,
+        # Update or create verification record
+        verification, _ = Verification.objects.update_or_create(
+            type=type,
+            target=target,
             defaults={'code': code, 'created_at': now()}
         )
 
-        send_verification_email(email, code)
+        # Send verification code
+        if type == 'mobile':
+            send_verification_sms(target, code)     # send_verification_sms.delay(target, code) for celery
+        else:
+            send_verification_email(target, code)   # send_verification_email.delay(target, code) for celery
 
-        response = {
-            "code": 0,
-            "message": "Verification code sent to your email."
-        }
-        return Response(response, status=status.HTTP_200_OK)
-    
+        return Response({"code": 0, "message": "인증번호 발송 완료"}, status=status.HTTP_200_OK)
 
-# Verification Code API
-class VerifyCodeAPIView(APIView):
+
+# Check Verification Code API
+class CheckVerificationView(APIView):
     def post(self, request):
-        email = request.data.get("email")
-        if not email:
-            response_error = {
-                "code": 1,
-                "message": "Email is required."
-            }
-            return Response(response_error, status=status.HTTP_400_BAD_REQUEST)
-        
-        code = request.data.get("code")
+        serializer = VerificationCheckSerializer(data=request.data)
         try:
-            record = EmailVerification.objects.get(email=email, code=code)
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
+            return Response({"code": 1, "message": "유효성 검사 실패", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        target = serializer.validated_data['target']
+        code = serializer.validated_data['code']
 
-        except EmailVerification.DoesNotExist:
-            response_error = {
-                "code": 2,
-                "message": "Invalid verification code."
-            }
-            return Response(response_error, status.HTTP_400_BAD_REQUEST)
+        # Find verification record by target
+        try:
+            verification = Verification.objects.get(target=target, code=code)
+        except Verification.DoesNotExist:
+            return Response({"code": 1, "message": "인증번호 불일치"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if record.is_expired():
-            response = {
-                "code": 3,
-                "message": "Verification code expired."
-            }
-            record.delete()
-            return Response(response, status.HTTP_400_BAD_REQUEST)
+        if verification.is_expired():
+            return Response({"code": 1, "message": "인증번호 만료"}, status=status.HTTP_400_BAD_REQUEST)
 
-        response = {
-            "code": 0,
-            "message": "Verification successful."
-        }
-        record.delete()
-        return Response(response, status=status.HTTP_200_OK)
+        return Response({"code": 0, "message": "인증 성공"}, status=status.HTTP_200_OK)

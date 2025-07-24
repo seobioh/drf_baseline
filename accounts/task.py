@@ -15,3 +15,7 @@ def send_verification_email(email, code):
         fail_silently=True,
     )    
     return True
+
+@shared_task
+def send_verification_sms(mobile, code):
+    pass

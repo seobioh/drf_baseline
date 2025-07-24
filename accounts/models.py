@@ -2,10 +2,12 @@
 app_name = "accounts"
 
 import uuid
+import hashlib
 
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager # Django's user model
-from django.utils import timezone
 from django.db import models
+from django.utils import timezone
+from django_cryptography.fields import encrypt
 
 class UserManager(BaseUserManager):
     def create_user(self, email, mobile, name, username=None, password=None, **extra_fields):
@@ -61,6 +63,8 @@ class User(AbstractBaseUser):  # Custom user model
     username = models.CharField(max_length=24, unique=True, blank=True)
 
     # Optional fields
+    ci = encrypt(models.CharField(max_length=100, null=True, blank=True))
+    ci_hash = models.CharField(max_length=64, unique=True, null=True, blank=True)
     profile_image = models.TextField(null=True, blank=True)
     birthday = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=6, null=True, blank=True)
@@ -88,7 +92,15 @@ class User(AbstractBaseUser):  # Custom user model
         db_table = "User"
         verbose_name = "User"
         verbose_name_plural = "Users"
-        
+
+    def save(self, *args, **kwargs):
+        if self.ci:
+            # ci가 있으면 sha256 해시 생성
+            self.ci_hash = hashlib.sha256(self.ci.encode('utf-8')).hexdigest()
+        else:
+            self.ci_hash = None
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.email
 
@@ -99,13 +111,43 @@ class User(AbstractBaseUser):  # Custom user model
         return self.is_admin
     
 
-class EmailVerification(models.Model):
-    email = models.EmailField(unique=True)
+# UserSocialAccount 모델
+class UserSocialAccount(models.Model):
+    PROVIDER_CHOICES = (
+        ('google', 'Google'),
+        ('kakao', 'Kakao'),
+        ('naver', 'Naver'),
+        ('apple', 'Apple'),
+    )
+
+    user = models.ForeignKey(User, related_name='social_accounts', on_delete=models.CASCADE)
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES)
+    provider_user_id = models.CharField(max_length=255)  # 소셜 고유 ID
+    connected_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('provider', 'provider_user_id')  # 같은 소셜에서 중복 방지
+
+    def __str__(self):
+        return f"{self.user_id} - {self.provider}"
+
+
+class Verification(models.Model):
+    TYPE_CHOICES = (
+        ('mobile', 'Mobile'),
+        ('email', 'Email'),
+    )
+
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    target = models.CharField(max_length=255)  # 전화번호 또는 이메일
     code = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('type', 'target')
 
     def is_expired(self):
         return timezone.now() > self.created_at + timezone.timedelta(minutes=5)
 
     def __str__(self):
-        return f'{self.email} - {self.code}'
+        return f"{self.type}:{self.target} - {self.code}"
