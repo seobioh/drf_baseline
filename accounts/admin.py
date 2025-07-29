@@ -2,8 +2,9 @@
 app_name = 'accounts'
 
 from django.contrib import admin
-from .models import User
+from .models import User, UserSocialAccount, Verification
 
+@admin.register(User)
 class UserAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'email', 'mobile', 'name', 'username',
@@ -12,4 +13,16 @@ class UserAdmin(admin.ModelAdmin):
         'is_active', 'is_business', 'is_staff', 'is_admin'
     )
 
-admin.site.register(User, UserAdmin)
+@admin.register(UserSocialAccount)
+class UserSocialAccountAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'user', 'provider', 'provider_user_id',
+        'connected_at'
+    )
+
+@admin.register(Verification)
+class VerificationAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'type', 'target', 'verification_code',
+        'created_at'
+    )

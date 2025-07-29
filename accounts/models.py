@@ -10,22 +10,18 @@ from django.utils import timezone
 from django_cryptography.fields import encrypt
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, mobile, name, username=None, password=None, **extra_fields):
+    def create_user(self, email, name, username=None, password=None, **extra_fields):
         if not email:
             raise ValueError("Email is required.")
-        if not mobile:
-            raise ValueError("Mobile number is required.")
         if not name:
             raise ValueError("Name is required.")        
         if not username:
             username = f"오리무새{uuid.uuid4().hex[:8]}"
 
         email = self.normalize_email(email)
-        mobile = self.normalize_email(mobile)
 
         user = self.model(
             email = email,
-            mobile = mobile,
             name = name,
             username = username,
             **extra_fields
@@ -34,18 +30,14 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
     
-    def create_superuser(self, email, mobile, name, username=None, password=None, **extra_fields):
+    def create_superuser(self, email, name, username=None, password=None, **extra_fields):
         extra_fields.setdefault('is_admin', True)
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_business', True)
         extra_fields.setdefault('is_active', True)
 
-        email = self.normalize_email(email)
-        mobile = self.normalize_email(mobile)
-
         user = self.create_user(
             email = email,
-            mobile = mobile,
             name = name,
             username = username,
             password = password,
@@ -54,11 +46,11 @@ class UserManager(BaseUserManager):
         return user
 
         
-class User(AbstractBaseUser):  # Custom user model
+class User(AbstractBaseUser):
     # Required fields
     id = models.AutoField(primary_key=True)                 # Primary Key
     email = models.EmailField(unique=True)                  # Unique = True
-    mobile = models.CharField(max_length=15, unique=True)   # Unique = True
+    mobile = models.CharField(max_length=15, unique=True, blank=True, null=True)   # Unique = True, blank = True, null = True
     name = models.CharField(max_length=24)
     username = models.CharField(max_length=24, unique=True, blank=True)
 
@@ -86,7 +78,7 @@ class User(AbstractBaseUser):  # Custom user model
     USERNAME_FIELD = 'email'
 
     # Required fields
-    REQUIRED_FIELDS = ['mobile', 'name']
+    REQUIRED_FIELDS = ['name']
 
     class Meta:
         db_table = "User"
@@ -95,8 +87,7 @@ class User(AbstractBaseUser):  # Custom user model
 
     def save(self, *args, **kwargs):
         if self.ci:
-            # ci가 있으면 sha256 해시 생성
-            self.ci_hash = hashlib.sha256(self.ci.encode('utf-8')).hexdigest()
+            self.ci_hash = hashlib.sha256(self.ci.encode('utf-8')).hexdigest()      # Create SHA256 hash if ci exists
         else:
             self.ci_hash = None
         super().save(*args, **kwargs)
@@ -111,7 +102,6 @@ class User(AbstractBaseUser):  # Custom user model
         return self.is_admin
     
 
-# UserSocialAccount 모델
 class UserSocialAccount(models.Model):
     PROVIDER_CHOICES = (
         ('google', 'Google'),
@@ -126,6 +116,8 @@ class UserSocialAccount(models.Model):
     connected_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        verbose_name = "User Social Account"
+        verbose_name_plural = "User Social Accounts"
         unique_together = ('provider', 'provider_user_id')  # 같은 소셜에서 중복 방지
 
     def __str__(self):
@@ -140,7 +132,7 @@ class Verification(models.Model):
 
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     target = models.CharField(max_length=255)  # 전화번호 또는 이메일
-    code = models.CharField(max_length=6)
+    verification_code = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -150,4 +142,4 @@ class Verification(models.Model):
         return timezone.now() > self.created_at + timezone.timedelta(minutes=5)
 
     def __str__(self):
-        return f"{self.type}:{self.target} - {self.code}"
+        return f"{self.type}:{self.target} - {self.verification_code}"
