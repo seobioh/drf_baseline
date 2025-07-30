@@ -1,10 +1,11 @@
 redis
 celery
+requests
 gunicorn
 python-dotenv
 djangorestframework
 djangorestframework-simplejwt
 django-cors-headers
 django-cryptography
+# psycopg2-binary
 pycryptodome
-requests
