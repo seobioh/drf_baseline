@@ -106,7 +106,7 @@ To enable email queuing (e.g., for sending verification codes):
 |---------------|---------|--------|-------|-------|---------------|----------|
 | id            | int     | PK     |       |       |               |          |
 | email         | email   | TRUE   |       |       |               |          |
-| mobile        | char    | TRUE   |       |       |               |          |
+| mobile        | char    | TRUE   | TRUE  | TRUE  |               |          |
 | password      |         |        |       |       |               |          |
 | name          | char    |        |       |       |               |          |
 | username      | char    | TRUE   | FALSE | TRUE  |               | TRUE     |

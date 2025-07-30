@@ -100,7 +100,7 @@ class User(AbstractBaseUser):
     
     def has_module_perms(self, app_label):
         return self.is_admin
-    
+
 
 class UserSocialAccount(models.Model):
     PROVIDER_CHOICES = (
@@ -121,7 +121,7 @@ class UserSocialAccount(models.Model):
         unique_together = ('provider', 'provider_user_id')  # 같은 소셜에서 중복 방지
 
     def __str__(self):
-        return f"{self.user_id} - {self.provider}"
+        return f"{self.user.email} - {self.provider}"
 
 
 class Verification(models.Model):
@@ -142,4 +142,38 @@ class Verification(models.Model):
         return timezone.now() > self.created_at + timezone.timedelta(minutes=5)
 
     def __str__(self):
-        return f"{self.type}:{self.target} - {self.verification_code}"
+        return f"{self.type} - {self.target}"
+
+
+class PassVerification(models.Model):
+    req_no = models.CharField(max_length=50, unique=True)  # 요청 고유번호
+    token_version_id = models.CharField(max_length=50)     # 토큰 버전 ID
+    key = encrypt(models.CharField(max_length=100))        # 암호화 키
+    iv = encrypt(models.CharField(max_length=100))         # 초기화 벡터
+    hmac_key = encrypt(models.CharField(max_length=100))   # HMAC 키
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)       # 인증 완료 여부
+    verified_at = models.DateTimeField(null=True, blank=True)  # 인증 완료 시간
+    
+    class Meta:
+        db_table = "PassVerification"
+        verbose_name = "Pass Verification"
+        verbose_name_plural = "Pass Verifications"
+        indexes = [
+            models.Index(fields=['req_no']),
+            models.Index(fields=['token_version_id']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"PassVerification(req_no={self.req_no}, verified={self.is_verified})"
+    
+    def is_expired(self):
+        """30분 후 만료"""
+        return timezone.now() > self.created_at + timezone.timedelta(minutes=30)
+    
+    def mark_as_verified(self):
+        """인증 완료로 표시"""
+        self.is_verified = True
+        self.verified_at = timezone.now()
+        self.save(update_fields=['is_verified', 'verified_at'])

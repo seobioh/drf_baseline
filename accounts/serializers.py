@@ -35,9 +35,12 @@ class UserSerializer(serializers.ModelSerializer):
         if password:
             instance.set_password(password)
         
-        # mobile이 변경되면 ci와 ci_hash 초기화 (변경사항이 있으면 무조건)
+        # mobile이나 name이 변경되면 ci와 ci_hash 초기화 (변경사항이 있으면 무조건)
+        name = validated_data.get('name')
         mobile = validated_data.get('mobile')
-        if 'mobile' in validated_data and mobile != instance.mobile:
+        
+        if ('name' in validated_data and name != instance.name) or \
+           ('mobile' in validated_data and mobile != instance.mobile):
             instance.ci = None
             instance.ci_hash = None
         
