@@ -2,9 +2,6 @@
 app_name = 'accounts'
 
 import random
-import requests
-import urllib.parse
-import json
 import hmac
 import hashlib
 import base64
@@ -20,6 +17,8 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, Toke
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
+
+from server.utils import ErrorResponseBuilder
 
 from .task import send_verification_email, send_verification_sms
 from .utils import NaverResponse, KakaoResponse, GoogleResponse, PassRequest, PassResponse
@@ -436,8 +435,6 @@ class PassAPIView(APIView):
             return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# Response Builder
-# <-------------------------------------------------------------------------------------------------------------------------------->
 # Auth Response Builder
 class AuthResponseBuilder:
     def __init__(self, user):
@@ -465,34 +462,3 @@ class AuthResponseBuilder:
                 "expires_in": token.access_token.lifetime.total_seconds(),
             },
         }
-
-
-# ErrorResponse
-class ErrorResponseBuilder:
-    def __init__(self):
-        self.message = "Error occurred"
-        self.code = 1
-        self.errors = {}
-
-    def with_message(self, message: str):
-        self.message = message
-        return self
-
-    def with_code(self, code: int):
-        self.code = code
-        return self
-
-    def with_errors(self, errors: dict):
-        self.errors = errors
-        return self
-
-    def build(self):
-        response = {
-            "code": self.code,
-            "message": self.message,
-        }
-        
-        if self.errors:
-            response["errors"] = self.errors
-            
-        return response
