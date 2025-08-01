@@ -460,7 +460,6 @@ class KakaoResponse:
         
         # 5. KakaoResponse 객체 생성
         profile_data = profile_response.json()
-        print(profile_data)
         kakao_response = cls(profile_data)
         
         if not kakao_response.is_valid:
