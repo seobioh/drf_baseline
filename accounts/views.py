@@ -186,11 +186,11 @@ class CheckVerificationView(APIView):
             response = ErrorResponseBuilder().with_message("유효성 검사 실패").with_errors(serializer.errors).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
         target = serializer.validated_data['target']
-        code = serializer.validated_data['code']
+        verification_code = serializer.validated_data['verification_code']
 
         # Find verification record by target
         try:
-            verification = Verification.objects.get(target=target, code=code)
+            verification = Verification.objects.get(target=target, verification_code=verification_code)
         except Verification.DoesNotExist:
             response = ErrorResponseBuilder().with_message("인증번호 불일치").build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
