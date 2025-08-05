@@ -169,8 +169,17 @@ class SendVerificationView(APIView):
 
         # Send verification code
         if type == 'mobile':
+            if User.objects.filter(mobile=target).exists():
+                response = ErrorResponseBuilder().with_message("이미 가입된 전화번호입니다.").build()
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
             send_verification_sms(target, verification_code)     # send_verification_sms.delay(target, verification_code) for celery
+
         else:
+            if User.objects.filter(email=target).exists():
+                response = ErrorResponseBuilder().with_message("이미 가입된 이메일입니다.").build()
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
             send_verification_email(target, verification_code)   # send_verification_email.delay(target, verification_code) for celery
 
         return Response({"code": 0, "message": "인증번호 발송 완료"}, status=status.HTTP_200_OK)
