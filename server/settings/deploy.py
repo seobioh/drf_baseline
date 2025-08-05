@@ -6,6 +6,8 @@ ALLOWED_HOSTS = ['*']
 
 CORS_ALLOWED_ORIGINS = ['http://localhost:8000']
 
+CSRF_TRUSTED_ORIGINS = ['http://localhost:8000']
+
 WSGI_APPLICATION = 'server.wsgi.deploy.application'
 
 # Celery

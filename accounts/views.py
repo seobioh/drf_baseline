@@ -169,9 +169,9 @@ class SendVerificationView(APIView):
 
         # Send verification code
         if type == 'mobile':
-            send_verification_sms(target, verification_code)     # send_verification_sms.delay(target, code) for celery
+            send_verification_sms(target, verification_code)     # send_verification_sms.delay(target, verification_code) for celery
         else:
-            send_verification_email(target, verification_code)   # send_verification_email.delay(target, code) for celery
+            send_verification_email(target, verification_code)   # send_verification_email.delay(target, verification_code) for celery
 
         return Response({"code": 0, "message": "인증번호 발송 완료"}, status=status.HTTP_200_OK)
 
