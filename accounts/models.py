@@ -14,16 +14,20 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("Email is required.")
         if not name:
-            raise ValueError("Name is required.")        
-        if not username:
-            username = f"오리무새{uuid.uuid4().hex[:8]}"
+            raise ValueError("Name is required.")
 
+        uuid8 = uuid.uuid4().hex[:8]
+        if not username:
+            username = f"오리무새{uuid8}"
+
+        referral_code = uuid8
         email = self.normalize_email(email)
 
         user = self.model(
             email = email,
             name = name,
             username = username,
+            referral_code = referral_code,
             **extra_fields
         )
         user.set_password(password)
@@ -60,6 +64,7 @@ class User(AbstractBaseUser):
     profile_image = models.TextField(null=True, blank=True)
     birthday = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=6, null=True, blank=True)
+    referral_code = models.CharField(max_length=10,  unique=True, null=True, blank=True)
 
     # Auto fields
     created_at = models.DateTimeField(auto_now_add=True)
