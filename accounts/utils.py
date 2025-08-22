@@ -10,6 +10,8 @@ import random
 import hashlib
 import secrets
 import requests
+import urllib.parse
+
 from datetime import datetime
 from Crypto.Cipher import AES
 
@@ -215,9 +217,7 @@ class GoogleResponse:
     
     @classmethod
     def create_from_code(cls, code, google_client_key, google_client_secret, google_callback_uri):
-        """구글 인증 코드로부터 GoogleResponse 객체 생성"""
-        import urllib.parse
-        
+        """구글 인증 코드로부터 GoogleResponse 객체 생성"""        
         # 1. URL 디코딩
         decoded_code = urllib.parse.unquote(code)
         
@@ -753,3 +753,102 @@ class PassResponse:
             'integrity_value': integrity_value
         }
         return cls(data)
+
+
+class PortOneResponse:
+    def __init__(self, data):
+        self.data = data
+        self.verified_customer = data.get('verifiedCustomer', {})
+    
+    @property
+    def status(self):
+        return self.data.get('status')
+    
+    @property
+    def is_verified(self):
+        return self.status == 'VERIFIED'
+        
+    @property
+    def identity_verification_id(self):
+        return self.data.get('id')
+    
+    @property
+    def ci(self):
+        return self.verified_customer.get('ci')
+    
+    @property
+    def di(self):
+        return self.verified_customer.get('di')
+    
+    @property
+    def name(self):
+        return self.verified_customer.get('name')
+    
+    @property
+    def gender(self):
+        return self.verified_customer.get('gender')
+    
+    @property
+    def birthday(self):
+        return self.verified_customer.get('birthDate')
+    
+    @property
+    def operator(self):
+        return self.verified_customer.get('operator')
+    
+    @property
+    def mobile(self):
+        """전화번호 (숫자만)"""
+        phone_number = self.verified_customer.get('phoneNumber')
+        if phone_number:
+            return ''.join(filter(str.isdigit, str(phone_number)))
+        return None
+    
+    @property
+    def is_foreigner(self):
+        is_foreigner = self.verified_customer.get('isForeigner')
+        if is_foreigner is not None:
+            return bool(is_foreigner)
+        return None
+
+    def to_user_data(self):
+        return {
+            'ci': self.ci,
+            'name': self.name,
+            'mobile': self.mobile,
+            'birthday': self.birthday,
+            'gender': self.gender,
+        }
+
+
+    def debug_print(self):
+        return f"PortOneResponse(status={self.status}, is_verified={self.is_verified}, customer_exists={bool(self.verified_customer)})"
+    
+    @classmethod
+    def create_from_code(cls, code, portone_api_secret):
+        """포트원 인증 코드로부터 PortOneResponse 객체 생성"""
+
+        url = f"https://api.portone.io/identity-verifications/{code}"
+        headers = {
+            "Authorization": f"PortOne {portone_api_secret}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(url, headers=headers)
+        
+        if not response.ok:
+            error_detail = response.json() if response.content else "Unknown error"
+            raise Exception(f"포트원 API 호출 실패: {response.status_code} - {error_detail}")
+        
+        response_json = response.json()
+        
+        # 인증 상태 확인
+        if response_json.get('status') != 'VERIFIED':
+            raise Exception(f"인증이 완료되지 않았습니다. 상태: {response_json.get('status')}")
+        
+        # 인증된 고객 정보 확인
+        verified_customer = response_json.get('verifiedCustomer')
+        if not verified_customer:
+            raise Exception("인증된 고객 정보를 찾을 수 없습니다.")
+        
+        return cls(response_json)

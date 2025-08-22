@@ -43,6 +43,7 @@ INSTALLED_APPS = [
 
     # My apps
     'accounts',
+    'users',
 ]
 
 REST_FRAMEWORK = {
@@ -165,10 +166,15 @@ KAKAO_CALLBACK_URI = os.getenv('KAKAO_CALLBACK_URI')
 GOOGLE_CLIENT_KEY = os.getenv('GOOGLE_CLIENT_KEY')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
 GOOGLE_CALLBACK_URI = os.getenv('GOOGLE_CALLBACK_URI')
+
+
+# Authentication
+
 NICE_CLIENT_ID = os.getenv('NICE_CLIENT_ID')
 NICE_ACCESS_TOKEN = os.getenv('NICE_ACCESS_TOKEN')
 NICE_SERVER_URI = os.getenv('NICE_SERVER_URI')
 NICE_PRODUCT_ID = os.getenv('NICE_PRODUCT_ID')
+PORTONE_API_SECRET = os.getenv('PORTONE_API_SECRET')
 
 
 AUTH_USER_MODEL = 'accounts.User'

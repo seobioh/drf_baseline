@@ -17,11 +17,12 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, Toke
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
+from django.db import IntegrityError
 
 from server.utils import ErrorResponseBuilder
 
 from .task import send_verification_email, send_verification_sms
-from .utils import NaverResponse, KakaoResponse, GoogleResponse, PassRequest, PassResponse
+from .utils import NaverResponse, KakaoResponse, GoogleResponse, PassRequest, PassResponse, PortOneResponse
 from .models import User, Verification, UserSocialAccount, PassVerification
 from .serializers import UserSerializer, SignUpSerializer, VerificationCheckSerializer, VerificationRequestSerializer, SocialSignUpSerializer
 from .permissions import IsAuthenticated, AllowAny
@@ -31,10 +32,29 @@ from .permissions import IsAuthenticated, AllowAny
 # Sign Up API
 class SignUpAPIView(APIView):
     def post(self, request):
-        request.data.get("verification_code")
         serializer = SignUpSerializer(data=request.data)
-        if serializer.is_valid():
+        if serializer.is_valid():                
             user = serializer.save()
+
+            identity_code = request.data.get("identity_code")
+            if identity_code is not None:
+                try:
+                    port_one_response = PortOneResponse.create_from_code(identity_code, settings.PORTONE_API_SECRET)
+                    user.ci = port_one_response.ci
+                    user.name = port_one_response.name
+                    user.mobile = port_one_response.mobile
+                    user.birthday = port_one_response.birthday
+                    user.gender = port_one_response.gender
+                    user.save()
+
+                except IntegrityError:
+                    response = ErrorResponseBuilder().with_message("이미 본인인증된 아이디가 존재합니다.").build()
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+                except Exception as error:
+                    user.delete()
+                    response = ErrorResponseBuilder().with_message("User Verification failed").with_errors({"error": str(error)}).build()
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
             response = AuthResponseBuilder(user).with_message("Register successful").build()
             return Response(response, status=status.HTTP_200_OK)
@@ -328,6 +348,8 @@ class AppleAPIView(APIView):
         pass
 
 
+# Authentication API
+# <-------------------------------------------------------------------------------------------------------------------------------->
 # PASS Authentication API
 class PassRequestAPIView(APIView):
     def get(self, request):
@@ -442,6 +464,45 @@ class PassAPIView(APIView):
         except Exception as error:
             response = ErrorResponseBuilder().with_message('본인인증 처리 중 오류가 발생했습니다').with_errors({"error": str(error)}).build()
             return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# PortOne API
+class PortOneAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        identity_code = request.data.get("identity_code")
+
+        if not identity_code:
+            response = ErrorResponseBuilder().with_message("identity_code is required").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = request.user
+
+            if user.ci:
+                response = ErrorResponseBuilder().with_message("이미 본인인증이 완료된 유저입니다.").build()
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+            port_one_response = PortOneResponse.create_from_code(identity_code, settings.PORTONE_API_SECRET)
+
+            user.ci = port_one_response.ci
+            user.name = port_one_response.name
+            user.mobile = port_one_response.mobile
+            user.birthday = port_one_response.birthday
+            user.gender = port_one_response.gender
+            user.save()
+
+            response = AuthResponseBuilder(user).with_message("본인인증 완료").build()
+            return Response(response, status=status.HTTP_200_OK)
+
+        except IntegrityError:
+            response = ErrorResponseBuilder().with_message("이미 본인인증된 아이디가 존재합니다.").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as error:
+            response = ErrorResponseBuilder().with_message("포트원 인증 실패").with_errors({"error": str(error)}).build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Auth Response Builder
