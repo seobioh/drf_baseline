@@ -18,10 +18,8 @@ from Crypto.Cipher import AES
 # Password Generator
 # <-------------------------------------------------------------------------------------------------------------------------------->
 def generate_random_password(length=12):
-    # 사용할 문자 집합 (대문자, 소문자, 숫자, 특수문자)
     characters = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
 
-    # 길이만큼 랜덤하게 선택해 문자열 생성
     password = ''.join(secrets.choice(characters) for _ in range(length))
     return password
 
@@ -29,7 +27,6 @@ def generate_random_password(length=12):
 # Mobile Generator
 # <-------------------------------------------------------------------------------------------------------------------------------->
 def generate_random_mobile():
-    # 한국 휴대폰 번호 형식: 010-XXXX-XXXX (11자리)
     prefix = "010"
     middle = ''.join(secrets.choice(string.digits) for _ in range(4))
     suffix = ''.join(secrets.choice(string.digits) for _ in range(4))
@@ -56,7 +53,6 @@ class NaverResponse:
     def mobile(self):
         mobile = self.response.get('mobile')
         if mobile:
-            # 010-0000-0000 형식을 01000000000 형식으로 변환
             mobile = mobile.replace('-', '')
         return mobile if mobile else None
     
@@ -115,8 +111,6 @@ class NaverResponse:
     
     @classmethod
     def create_from_code(cls, code, state, naver_client_id, naver_client_secret):
-        """네이버 인증 코드로부터 NaverResponse 객체 생성"""
-        
         # 1. 인증 코드로 액세스 토큰 요청
         token_data = {
             'grant_type': 'authorization_code',
@@ -217,7 +211,6 @@ class GoogleResponse:
     
     @classmethod
     def create_from_code(cls, code, google_client_key, google_client_secret, google_callback_uri):
-        """구글 인증 코드로부터 GoogleResponse 객체 생성"""        
         # 1. URL 디코딩
         decoded_code = urllib.parse.unquote(code)
         
@@ -281,7 +274,6 @@ class KakaoResponse:
     def mobile(self):
         phone_number = self.kakao_account.get('phone_number')
         if phone_number:
-            # +82 10-1234-5678 형식을 01012345678 형식으로 변환
             phone_number = phone_number.replace('+82 ', '0').replace('-', '')
         return phone_number if phone_number else None
     
@@ -353,7 +345,6 @@ class KakaoResponse:
     def for_partner(self):
         return self.data.get('for_partner', {})
     
-    # 동의 항목 관련 속성들
     @property
     def profile_needs_agreement(self):
         return self.kakao_account.get('profile_needs_agreement')
@@ -425,8 +416,6 @@ class KakaoResponse:
     
     @classmethod
     def create_from_code(cls, code, kakao_client_key, kakao_callback_uri):
-        """카카오 인증 코드로부터 KakaoResponse 객체 생성"""
-        
         # 1. 인증 코드로 액세스 토큰 요청
         token_url = "https://kauth.kakao.com/oauth/token"
         token_params = {
@@ -474,62 +463,50 @@ class PassRequest:
     
     @property
     def req_no(self):
-        """요청 고유번호"""
         return self.data.get('req_no')
     
     @property
     def req_dtim(self):
-        """요청 일시"""
         return self.data.get('req_dtim')
     
     @property
     def token_val(self):
-        """토큰 값"""
         return self.data.get('token_val')
     
     @property
     def result_val(self):
-        """결과 값 (암호화 키 생성용)"""
         return self.data.get('resultVal')
     
     @property
     def key(self):
-        """암호화 키"""
         return self.data.get('key')
     
     @property
     def iv(self):
-        """초기화 벡터"""
         return self.data.get('iv')
     
     @property
     def hmac_key(self):
-        """HMAC 키"""
         return self.data.get('hmac_key')
     
     @property
     def plain(self):
-        """평문 데이터"""
         return self.data.get('plain')
     
     @property
     def token_version_id(self):
-        """토큰 버전 ID"""
         return self.data.get('token_version_id')
     
     @property
     def enc_data(self):
-        """암호화된 데이터"""
         return self.data.get('enc_data')
     
     @property
     def integrity(self):
-        """무결성 값"""
         return self.data.get('integrity')
     
     @property
     def is_valid(self):
-        """유효한 응답인지 확인"""
         return bool(
             self.req_no and 
             self.token_version_id and 
@@ -538,7 +515,6 @@ class PassRequest:
         )
     
     def to_frontend_data(self):
-        """프론트엔드에 전달할 데이터"""
         return {
             'req_no': self.req_no,
             'req_dtim': self.req_dtim,
@@ -549,7 +525,6 @@ class PassRequest:
         }
     
     def to_session_data(self):
-        """세션 저장용 데이터"""
         return {
             'token_version_id': self.token_version_id,
             'req_no': self.req_no,
@@ -559,13 +534,10 @@ class PassRequest:
         }
     
     def debug_print(self):
-        """디버그용 출력"""
         return f"PassRequest(req_no={self.req_no}, token_version_id={self.token_version_id}, is_valid={self.is_valid})"
     
     @classmethod
     def create_from_nice_api(cls, nice_access_token, nice_client_id, nice_product_id, nice_server_uri):
-        """NICE API를 호출하여 PassResponse 객체 생성"""
-        
         # 1. 요청 데이터 생성
         now = str(int(time.time()))
         req_dtim = datetime.now().strftime('%Y%m%d%H%M%S')
@@ -646,7 +618,6 @@ class PassRequest:
     
     @staticmethod
     def encrypt_data(plain_data, key, iv):
-        """데이터 암호화"""
         block_size = 16
         pad = lambda s: s + (block_size - len(s) % block_size) * chr(block_size - len(s) % block_size)
         cipher = AES.new(key.encode("utf8"), AES.MODE_CBC, iv.encode("utf8"))
@@ -654,34 +625,27 @@ class PassRequest:
 
 
 class PassResponse:
-    """NICE 본인인증 응답 데이터를 파싱하는 클래스"""
-    
     def __init__(self, data):
         self.data = data
     
     @property
     def req_no(self):
-        """요청 고유번호"""
         return self.data.get('req_no')
     
     @property
     def token_version_id(self):
-        """토큰 버전 ID"""
         return self.data.get('token_version_id')
     
     @property
     def enc_data(self):
-        """암호화된 데이터"""
         return self.data.get('enc_data')
     
     @property
     def integrity_value(self):
-        """무결성 값"""
         return self.data.get('integrity_value')
     
     @property
     def is_valid(self):
-        """유효한 응답인지 확인"""
         return bool(
             self.req_no and 
             self.token_version_id and 
@@ -690,7 +654,6 @@ class PassResponse:
         )
     
     def parse_user_data(self, key, iv):
-        """복호화된 사용자 데이터 파싱"""
         try:
             # 데이터 복호화
             decrypted_data = self.decrypt_data(self.enc_data, key, iv)
@@ -718,13 +681,11 @@ class PassResponse:
     
     @staticmethod
     def decrypt_data(enc_data, key, iv):
-        """데이터 복호화"""
         encryptor = AES.new(key.encode('utf-8'), AES.MODE_CBC, iv.encode('utf-8'))
         unpad = lambda s: s[0:-ord(s[-1:])]
         return unpad(encryptor.decrypt(base64.b64decode(enc_data))).decode('euc-kr')
     
     def to_user_data(self):
-        """사용자 데이터로 변환 (기본값 사용)"""
         return {
             'name': '',
             'birthdate': '',
@@ -740,12 +701,10 @@ class PassResponse:
         }
     
     def debug_print(self):
-        """디버그용 출력"""
         return f"PassResponse(req_no={self.req_no}, token_version_id={self.token_version_id}, is_valid={self.is_valid})"
     
     @classmethod
     def create_from_request_data(cls, req_no, token_version_id, enc_data, integrity_value):
-        """요청 데이터로부터 PassResponse 객체 생성"""
         data = {
             'req_no': req_no,
             'token_version_id': token_version_id,
@@ -798,7 +757,6 @@ class PortOneResponse:
     
     @property
     def mobile(self):
-        """전화번호 (숫자만)"""
         phone_number = self.verified_customer.get('phoneNumber')
         if phone_number:
             return ''.join(filter(str.isdigit, str(phone_number)))
@@ -826,8 +784,6 @@ class PortOneResponse:
     
     @classmethod
     def create_from_code(cls, code, portone_api_secret):
-        """포트원 인증 코드로부터 PortOneResponse 객체 생성"""
-
         url = f"https://api.portone.io/identity-verifications/{code}"
         headers = {
             "Authorization": f"PortOne {portone_api_secret}",
