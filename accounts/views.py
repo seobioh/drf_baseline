@@ -64,6 +64,17 @@ class SignUpAPIView(APIView):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Check Email API
+class CheckEmailAPIView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        if User.objects.filter(email=email).exists():
+            response = ErrorResponseBuilder().with_message("이미 가입된 이메일입니다.").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"code": 0, "message": "사용 가능한 이메일입니다."}, status=status.HTTP_200_OK)
+
+
 # Token Refresh API
 class TokenRefreshAPIView(APIView):
     def post(self, request):
