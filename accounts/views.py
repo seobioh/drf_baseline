@@ -75,6 +75,39 @@ class CheckEmailAPIView(APIView):
             return Response({"code": 0, "message": "사용 가능한 이메일입니다."}, status=status.HTTP_200_OK)
 
 
+# Reset Password API
+class ResetPasswordAPIView(APIView):
+    def post(self, request):
+        serializer = VerificationCheckSerializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
+            response = ErrorResponseBuilder().with_message("유효성 검사 실패").with_errors(serializer.errors).build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        target = serializer.validated_data['target']
+        verification_code = serializer.validated_data['verification_code']
+
+        # Find verification record by target
+        try:
+            verification = Verification.objects.get(target=target, verification_code=verification_code)
+        except Verification.DoesNotExist:
+            response = ErrorResponseBuilder().with_message("인증번호 불일치").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+        if verification.is_expired():
+            response = ErrorResponseBuilder().with_message("인증번호 만료").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+        if verification.type == 'mobile':
+            user = User.objects.get(mobile=verification.target)
+        else:
+            user = User.objects.get(email=verification.target)
+
+        verification.delete()
+        response = AuthResponseBuilder(user).with_message("Verification successful").build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
 # Token Refresh API
 class TokenRefreshAPIView(APIView):
     def post(self, request):
@@ -187,6 +220,7 @@ class SendVerificationView(APIView):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
         type = serializer.validated_data['type']
         target = serializer.validated_data['target']
+        check_unique = request.data.get('check_unique')
 
         # 6 digits random code
         verification_code = f"{random.randint(0, 999999):06d}"
@@ -197,19 +231,21 @@ class SendVerificationView(APIView):
             target=target,
             defaults={'verification_code': verification_code, 'created_at': now()}
         )
-
+        
         # Send verification code
         if type == 'mobile':
-            if User.objects.filter(mobile=target).exists():
-                response = ErrorResponseBuilder().with_message("이미 가입된 전화번호입니다.").build()
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            if check_unique:
+                if User.objects.filter(mobile=target).exists():
+                    response = ErrorResponseBuilder().with_message("이미 가입된 전화번호입니다.").build()
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
             send_verification_sms(target, verification_code)     # send_verification_sms.delay(target, verification_code) for celery
 
         else:
-            if User.objects.filter(email=target).exists():
-                response = ErrorResponseBuilder().with_message("이미 가입된 이메일입니다.").build()
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            if check_unique:
+                if User.objects.filter(email=target).exists():
+                    response = ErrorResponseBuilder().with_message("이미 가입된 이메일입니다.").build()
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
             send_verification_email(target, verification_code)   # send_verification_email.delay(target, verification_code) for celery
 
