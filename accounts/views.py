@@ -78,34 +78,46 @@ class CheckEmailAPIView(APIView):
 # Reset Password API
 class ResetPasswordAPIView(APIView):
     def post(self, request):
-        serializer = VerificationCheckSerializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-        except Exception as e:
-            response = ErrorResponseBuilder().with_message("유효성 검사 실패").with_errors(serializer.errors).build()
-            return Response(response, status=status.HTTP_400_BAD_REQUEST)
-        target = serializer.validated_data['target']
-        verification_code = serializer.validated_data['verification_code']
+        try:    
+            identity_code = request.data.get("identity_code")
+            if identity_code is not None:
+                port_one_response = PortOneResponse.create_from_code(identity_code, settings.PORTONE_API_SECRET)
+                user = User.objects.get(ci=port_one_response.ci)
 
-        # Find verification record by target
-        try:
-            verification = Verification.objects.get(target=target, verification_code=verification_code)
+            else:
+                serializer = VerificationCheckSerializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+
+                target = serializer.validated_data['target']
+                verification_code = serializer.validated_data['verification_code']
+                verification = Verification.objects.get(target=target, verification_code=verification_code)
+
+                if verification.is_expired():
+                    response = ErrorResponseBuilder().with_message("인증번호 만료").build()
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+                if verification.type == 'mobile':
+                    user = User.objects.get(mobile=verification.target)
+
+                else:
+                    user = User.objects.get(email=verification.target)
+
+                verification.delete()
+
+            response = AuthResponseBuilder(user).with_message("Verification successful").build()
+            return Response(response, status=status.HTTP_200_OK)
+
+        except User.DoesNotExist:
+            response = ErrorResponseBuilder().with_message("User not found").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
         except Verification.DoesNotExist:
             response = ErrorResponseBuilder().with_message("인증번호 불일치").build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
-        if verification.is_expired():
-            response = ErrorResponseBuilder().with_message("인증번호 만료").build()
-            return Response(response, status=status.HTTP_400_BAD_REQUEST)
-
-        if verification.type == 'mobile':
-            user = User.objects.get(mobile=verification.target)
-        else:
-            user = User.objects.get(email=verification.target)
-
-        verification.delete()
-        response = AuthResponseBuilder(user).with_message("Verification successful").build()
-        return Response(response, status=status.HTTP_200_OK)
+        except Exception as e:
+            response = ErrorResponseBuilder().with_message("처리 중 오류가 발생했습니다").with_errors({"error": str(e)}).build()
+            return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # Token Refresh API
@@ -150,12 +162,8 @@ class AccountAPIView(APIView):
     # Get Account Info (Authenticated Users Only)
     def get(self, request):
         user = request.user
-        serializer = UserSerializer(user)
-
-        # Update last access time
         user.last_access = now()
         user.save(update_fields=["last_access"])
-
         response = AuthResponseBuilder(user).with_message("Sign In successful").build()
         return Response(response, status=status.HTTP_200_OK)
         
@@ -163,12 +171,8 @@ class AccountAPIView(APIView):
     def post(self, request):
         user = authenticate(email=request.data.get("email"), password=request.data.get("password"))
         if user is not None:
-            serializer = UserSerializer(user)
-
-            # Update last login time
             user.last_access = now()
             user.save(update_fields=["last_access"])
-
             response = AuthResponseBuilder(user).with_message("Sign In successful").build()
             return Response(response, status=status.HTTP_200_OK)
         
@@ -215,9 +219,11 @@ class SendVerificationView(APIView):
         serializer = VerificationRequestSerializer(data=request.data)
         try:
             serializer.is_valid(raise_exception=True)
+
         except Exception as e:
             response = ErrorResponseBuilder().with_message("유효성 검사 실패").with_errors(serializer.errors).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
         type = serializer.validated_data['type']
         target = serializer.validated_data['target']
         check_unique = request.data.get('check_unique')
@@ -291,26 +297,25 @@ class NaverAPIView(APIView):
             naver_response = NaverResponse.create_from_code(code, state, settings.NAVER_CLIENT_ID, settings.NAVER_CLIENT_SECRET)
             
             # 1. 기존 소셜 계정으로 유저 찾기
-            try:
-                social_account = UserSocialAccount.objects.get(provider='naver', provider_user_id=naver_response.id)
-                user = social_account.user
-                user.last_access = now()
-                user.save(update_fields=["last_access"])
-                response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+            social_account = UserSocialAccount.objects.get(provider='naver', provider_user_id=naver_response.id)
+            user = social_account.user
+            user.last_access = now()
+            user.save(update_fields=["last_access"])
+            response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+            return Response(response, status=status.HTTP_200_OK)
+
+        # 2. 없으면 회원가입 처리
+        except UserSocialAccount.DoesNotExist:
+            user_data = naver_response.to_user_data()
+            serializer = SocialSignUpSerializer(data=user_data)
+            if serializer.is_valid():
+                user = serializer.save()
+                response = AuthResponseBuilder(user).with_message("Register & Sign In successful").build()
                 return Response(response, status=status.HTTP_200_OK)
 
-            # 2. 없으면 회원가입 처리
-            except UserSocialAccount.DoesNotExist:
-                user_data = naver_response.to_user_data()
-                serializer = SocialSignUpSerializer(data=user_data)
-                if serializer.is_valid():
-                    user = serializer.save()
-                    response = AuthResponseBuilder(user).with_message("Register & Sign In successful").build()
-                    return Response(response, status=status.HTTP_200_OK)
-
-                else:
-                    response = ErrorResponseBuilder().with_message("Social sign in failed").with_errors(serializer.errors).build()
-                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                response = ErrorResponseBuilder().with_message("Social sign in failed").with_errors(serializer.errors).build()
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
             
         except ValueError as error:
             response = ErrorResponseBuilder().with_message("네이버 로그인 실패").with_errors({"error": str(error)}).build()
@@ -327,26 +332,25 @@ class GoogleAPIView(APIView):
             google_response = GoogleResponse.create_from_code(code, settings.GOOGLE_CLIENT_KEY, settings.GOOGLE_CLIENT_SECRET, settings.GOOGLE_CALLBACK_URI)
             
             # 1. 기존 소셜 계정으로 유저 찾기
-            try:
-                social_account = UserSocialAccount.objects.get(provider='google', provider_user_id=google_response.id)
-                user = social_account.user
-                user.last_access = now()
-                user.save(update_fields=["last_access"])
-                response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+            social_account = UserSocialAccount.objects.get(provider='google', provider_user_id=google_response.id)
+            user = social_account.user
+            user.last_access = now()
+            user.save(update_fields=["last_access"])
+            response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+            return Response(response, status=status.HTTP_200_OK)
+
+        # 2. 없으면 회원가입처럼 처리
+        except UserSocialAccount.DoesNotExist:
+            user_data = google_response.to_user_data()
+            serializer = SocialSignUpSerializer(data=user_data)
+            if serializer.is_valid():
+                user = serializer.save()
+                response = AuthResponseBuilder(user).with_message("Register & Sign In successful").build()
                 return Response(response, status=status.HTTP_200_OK)
 
-            # 2. 없으면 회원가입처럼 처리
-            except UserSocialAccount.DoesNotExist:
-                user_data = google_response.to_user_data()
-                serializer = SocialSignUpSerializer(data=user_data)
-                if serializer.is_valid():
-                    user = serializer.save()
-                    response = AuthResponseBuilder(user).with_message("Register & Sign In successful").build()
-                    return Response(response, status=status.HTTP_200_OK)
-
-                else:
-                    response = ErrorResponseBuilder().with_message("Social sign in failed").with_errors(serializer.errors).build()
-                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                response = ErrorResponseBuilder().with_message("Social sign in failed").with_errors(serializer.errors).build()
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
             
         except ValueError as error:
             response = ErrorResponseBuilder().with_message("구글 로그인 실패").with_errors({"error": str(error)}).build()
@@ -363,26 +367,25 @@ class KakaoAPIView(APIView):
             kakao_response = KakaoResponse.create_from_code(code, settings.KAKAO_CLIENT_KEY, settings.KAKAO_CALLBACK_URI)
             
             # 1. 기존 소셜 계정으로 유저 찾기
-            try:
-                social_account = UserSocialAccount.objects.get(provider='kakao', provider_user_id=kakao_response.id)
-                user = social_account.user
-                user.last_access = now()
-                user.save(update_fields=["last_access"])
-                response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+            social_account = UserSocialAccount.objects.get(provider='kakao', provider_user_id=kakao_response.id)
+            user = social_account.user
+            user.last_access = now()
+            user.save(update_fields=["last_access"])
+            response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+            return Response(response, status=status.HTTP_200_OK)
+
+        # 2. 없으면 회원가입처럼 처리
+        except UserSocialAccount.DoesNotExist:
+            user_data = kakao_response.to_user_data()
+            serializer = SocialSignUpSerializer(data=user_data)
+            if serializer.is_valid():
+                user = serializer.save()
+                response = AuthResponseBuilder(user).with_message("Register & Sign In successful").build()
                 return Response(response, status=status.HTTP_200_OK)
 
-            # 2. 없으면 회원가입처럼 처리
-            except UserSocialAccount.DoesNotExist:
-                user_data = kakao_response.to_user_data()
-                serializer = SocialSignUpSerializer(data=user_data)
-                if serializer.is_valid():
-                    user = serializer.save()
-                    response = AuthResponseBuilder(user).with_message("Register & Sign In successful").build()
-                    return Response(response, status=status.HTTP_200_OK)
-
-                else:
-                    response = ErrorResponseBuilder().with_message("Social sign in failed").with_errors(serializer.errors).build()
-                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                response = ErrorResponseBuilder().with_message("Social sign in failed").with_errors(serializer.errors).build()
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
             
         except ValueError as error:
             response = ErrorResponseBuilder().with_message("카카오 로그인 실패").with_errors({"error": str(error)}).build()
@@ -446,68 +449,40 @@ class PassAPIView(APIView):
                 }).build()
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
             
-            # DB에서 인증 세션 데이터 조회
-            try:
-                pass_verification = PassVerification.objects.get(
-                    req_no=req_no,
-                    token_version_id=token_version_id
-                )
-            except PassVerification.DoesNotExist:
-                response = ErrorResponseBuilder().with_message("유효하지 않은 인증 요청입니다.").build()
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
-            # 만료 확인 (30분)
+            pass_verification = PassVerification.objects.get(req_no=req_no, token_version_id=token_version_id)
             if pass_verification.is_expired():
                 response = ErrorResponseBuilder().with_message("인증 요청이 만료되었습니다.").build()
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
-            # 이미 인증 완료된 경우
+
             if pass_verification.is_verified:
                 response = ErrorResponseBuilder().with_message("이미 인증이 완료된 요청입니다.").build()
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
             
             # 무결성 검증 (HMAC)
-            h = hmac.new(
-                key=pass_verification.hmac_key.encode(),
-                msg=enc_data.encode('utf-8'),
-                digestmod=hashlib.sha256
-            ).digest()
+            h = hmac.new(key=pass_verification.hmac_key.encode(), msg=enc_data.encode('utf-8'), digestmod=hashlib.sha256).digest()
             calculated_integrity = base64.b64encode(h).decode('utf-8')
-            
             if calculated_integrity != integrity_value:
                 response = ErrorResponseBuilder().with_message("무결성 검증에 실패했습니다.").build()
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
             
-            # PassResponse 객체 생성 및 사용자 데이터 파싱
-            try:
-                pass_response = PassResponse.create_from_request_data(
-                    req_no=req_no,
-                    token_version_id=token_version_id,
-                    enc_data=enc_data,
-                    integrity_value=integrity_value
-                )
-                
-                # 사용자 데이터 파싱
-                user_data = pass_response.parse_user_data(
-                    key=pass_verification.key,
-                    iv=pass_verification.iv
-                )
-            except Exception as error:
-                response = ErrorResponseBuilder().with_message("사용자 데이터 파싱에 실패했습니다.").with_errors({"error": str(error)}).build()
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
-            # 인증 완료로 표시
+            pass_response = PassResponse.create_from_request_data(req_no=req_no, token_version_id=token_version_id, enc_data=enc_data, integrity_value=integrity_value)
+            user_data = pass_response.parse_user_data(key=pass_verification.key, iv=pass_verification.iv)
             pass_verification.mark_as_verified()
             
-            return Response({
+            response = {
                 'code': 0,
                 'message': '본인인증이 완료되었습니다.',
                 'data': {
                     'req_no': req_no,
                     'user_data': user_data
                 }
-            }, status=status.HTTP_200_OK)
-            
+            }
+            return Response(response, status=status.HTTP_200_OK)
+
+        except PassVerification.DoesNotExist:
+            response = ErrorResponseBuilder().with_message("유효하지 않은 인증 요청입니다.").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
         except Exception as error:
             response = ErrorResponseBuilder().with_message('본인인증 처리 중 오류가 발생했습니다').with_errors({"error": str(error)}).build()
             return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
