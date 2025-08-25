@@ -8,7 +8,7 @@ from .models import User, UserSocialAccount, Verification
 class UserAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'email', 'mobile', 'name', 'username',
-        'ci_hash', 'birthday', 'gender', 'profile_image', 'referral_code',
+        'ci_hash', 'birthday', 'gender', 'profile_image', 'referral_code', 'point',
         'created_at', 'modified_at', 'last_access', 
         'is_active', 'is_business', 'is_staff', 'is_admin'
     )

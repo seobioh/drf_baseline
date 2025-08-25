@@ -65,6 +65,7 @@ class User(AbstractBaseUser):
     birthday = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=6, null=True, blank=True)
     referral_code = models.CharField(max_length=10,  unique=True, null=True, blank=True)
+    point = models.IntegerField(default=0)
 
     # Auto fields
     created_at = models.DateTimeField(auto_now_add=True)

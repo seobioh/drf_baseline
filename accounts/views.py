@@ -19,6 +19,7 @@ from django.contrib.auth import authenticate
 from django.utils.timezone import now
 from django.db import IntegrityError
 
+from users.rules import RefferalRule
 from server.utils import ErrorResponseBuilder
 
 from .task import send_verification_email, send_verification_sms
@@ -37,7 +38,7 @@ class SignUpAPIView(APIView):
             user = serializer.save()
 
             identity_code = request.data.get("identity_code")
-            if identity_code is not None:
+            if identity_code:
                 try:
                     port_one_response = PortOneResponse.create_from_code(identity_code, settings.PORTONE_API_SECRET)
                     user.ci = port_one_response.ci
@@ -55,6 +56,13 @@ class SignUpAPIView(APIView):
                     user.delete()
                     response = ErrorResponseBuilder().with_message("User Verification failed").with_errors({"error": str(error)}).build()
                     return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+            referral_code = request.data.get("referral_code")
+            if referral_code:
+                referree = User.objects.filter(referral_code=referral_code).first()
+                if referree:
+                    referral_rule = RefferalRule(user, referree)
+                    referral_rule.create()
 
             response = AuthResponseBuilder(user).with_message("Register successful").build()
             return Response(response, status=status.HTTP_200_OK)

@@ -14,13 +14,14 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'email', 'mobile', 'name', 'username',
-            'ci_verified', 'birthday', 'gender', 'profile_image', 'referral_code',
+            'ci_verified', 'birthday', 'gender', 'profile_image', 'referral_code', 'point',
             'password', 'last_access', 'created_at', 'modified_at'
         ]
         extra_kwargs = {
             'email': {'read_only': True},
             'ci_verified': {'read_only': True},
             'referral_code': {'read_only': True},
+            'point': {'read_only': True},
             'password': {'write_only': True},
             'last_access': {'read_only': True},
             'created_at': {'read_only': True},
