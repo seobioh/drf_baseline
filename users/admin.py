@@ -47,7 +47,7 @@ class PointCouponAdmin(admin.ModelAdmin):
 @admin.register(PointTransaction)
 class PointTransactionAdmin(admin.ModelAdmin):
     list_display = [
-        'id', 'user', 'amount', 'transaction_type', 'transaction_id',
+        'id', 'user', 'amount', 'description', 'transaction_type', 'transaction_id',
         'is_active', 'created_at'
     ]
     list_filter = ['transaction_type', 'is_active', 'created_at', 'modified_at']
@@ -57,7 +57,7 @@ class PointTransactionAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Transaction Information', {
-            'fields': ('user', 'amount', 'transaction_type', 'transaction_id')
+            'fields': ('user', 'amount', 'description', 'transaction_type', 'transaction_id')
         }),
         ('Status', {
             'fields': ('is_active',)

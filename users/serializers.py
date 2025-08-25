@@ -24,5 +24,5 @@ class ReferralSerializer(serializers.ModelSerializer):
 class PointTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = PointTransaction
-        fields = ['id', 'user', 'amount', 'transaction_type', 'transaction_id', 'created_at', 'modified_at']
-        read_only_fields = ['id', 'user', 'amount', 'transaction_type', 'transaction_id', 'created_at', 'modified_at']
+        fields = ['id', 'user', 'amount', 'description', 'transaction_type', 'transaction_id', 'created_at', 'modified_at']
+        read_only_fields = ['id', 'user', 'amount', 'description', 'transaction_type', 'transaction_id', 'created_at', 'modified_at']

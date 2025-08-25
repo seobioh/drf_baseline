@@ -107,6 +107,7 @@ class PointTransaction(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='point_transactions')
     amount = models.IntegerField()
+    description = models.TextField(null=True, blank=True)
 
     transaction_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     transaction_id = models.IntegerField(null=True, blank=True)
@@ -121,9 +122,13 @@ class PointTransaction(models.Model):
         verbose_name_plural = 'Point Transactions'
 
     def save(self, *args, **kwargs):
-        points = self.user.point_transactions.filter(is_active=True).aggregate(total=models.Sum('amount'))['total'] or 0
-        total_points = points + self.amount
+        if not self.pk:
+            points = self.user.point_transactions.filter(is_active=True).aggregate(total=models.Sum('amount'))['total'] or 0
 
+        else:
+            points = self.user.point_transactions.filter(is_active=True).exclude(pk=self.pk).aggregate(total=models.Sum('amount'))['total'] or 0
+
+        total_points = points + self.amount
         if total_points < 0:
             raise ValidationError("포인트 잔액이 부족합니다.")
 
