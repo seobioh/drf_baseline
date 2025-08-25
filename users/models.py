@@ -127,7 +127,7 @@ class PointTransaction(models.Model):
         if total_points < 0:
             raise ValidationError("포인트 잔액이 부족합니다.")
 
-        self.user.point = points
+        self.user.point = total_points
         self.user.save()
         
         super().save(*args, **kwargs)
