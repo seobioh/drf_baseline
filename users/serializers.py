@@ -3,7 +3,7 @@ app_name = 'users'
 
 from rest_framework import serializers
 
-from .models import Referral
+from .models import Referral, PointTransaction
 
 class ReferralSerializer(serializers.ModelSerializer):
     referrer_username = serializers.SerializerMethodField()
@@ -19,3 +19,10 @@ class ReferralSerializer(serializers.ModelSerializer):
     
     def get_referree_username(self, obj):
         return obj.referree.username if obj.referree else None
+
+
+class PointTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PointTransaction
+        fields = ['id', 'user', 'amount', 'transaction_type', 'transaction_id', 'created_at', 'modified_at']
+        read_only_fields = ['id', 'user', 'amount', 'transaction_type', 'transaction_id', 'created_at', 'modified_at']

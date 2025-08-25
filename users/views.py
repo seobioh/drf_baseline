@@ -10,9 +10,9 @@ from django.shortcuts import get_object_or_404
 from accounts.models import User
 
 from .rules import RefferalRule
-from .models import Referral
+from .models import Referral, PointCoupon, PointTransaction
 from .permissions import IsAuthenticated
-from .serializers import ReferralSerializer
+from .serializers import ReferralSerializer, PointTransactionSerializer
 
 class ReferralAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -45,3 +45,32 @@ class ReferralDetailAPIView(APIView):
         referral = referral_rule.create()
         
         return Response(ReferralSerializer(referral).data,  status=status.HTTP_201_CREATED)
+
+
+class PointCouponAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, coupon_code):
+        coupon = get_object_or_404(PointCoupon, code=coupon_code, is_active=True)
+
+        used_count = PointTransaction.objects.filter(transaction_id=coupon.id, transaction_type='COUPON').count()
+        if used_count >= coupon.usage_limit:
+            return Response({'error': 'Coupon is not available'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user_used_count = PointTransaction.objects.filter(user=request.user, transaction_id=coupon.id, transaction_type='COUPON').count()
+        if user_used_count >= coupon.usage_limit_per_user:
+            return Response({'error': 'You have reached the usage limit for this coupon'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not coupon.is_valid_now:
+            return Response({'error': 'Coupon is not valid'}, status=status.HTTP_400_BAD_REQUEST)
+
+        PointTransaction.objects.create(user=request.user, transaction_id=coupon.id, amount=coupon.amount, transaction_type='COUPON')
+        return Response({'message': 'Coupon used successfully'}, status=status.HTTP_200_OK)
+
+
+class PointTransactionAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        transactions = PointTransaction.objects.filter(user=request.user)
+        return Response(PointTransactionSerializer(transactions, many=True).data, status=status.HTTP_200_OK)
