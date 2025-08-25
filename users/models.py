@@ -124,7 +124,6 @@ class PointTransaction(models.Model):
     def save(self, *args, **kwargs):
         if not self.pk:
             points = self.user.point_transactions.filter(is_active=True).aggregate(total=models.Sum('amount'))['total'] or 0
-
         else:
             points = self.user.point_transactions.filter(is_active=True).exclude(pk=self.pk).aggregate(total=models.Sum('amount'))['total'] or 0
 
@@ -134,7 +133,6 @@ class PointTransaction(models.Model):
 
         self.user.point = total_points
         self.user.save()
-        
         super().save(*args, **kwargs)
 
     def __str__(self):
