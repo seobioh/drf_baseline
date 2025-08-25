@@ -7,6 +7,7 @@ from rest_framework import status
 
 from django.shortcuts import get_object_or_404
 
+from server.utils import ErrorResponseBuilder
 from accounts.models import User
 
 from .rules import RefferalRule
@@ -35,10 +36,12 @@ class ReferralDetailAPIView(APIView):
     def post(self, request, referral_code):
         user = request.user
         if user.referral_code == referral_code:
-            return Response({'error': 'Cannot refer yourself'}, status=status.HTTP_400_BAD_REQUEST)
+            response = ErrorResponseBuilder().with_message("Cannot refer yourself").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
         
         if Referral.objects.filter(referrer=user).exists():
-            return Response({'error': 'You can only refer one person'}, status=status.HTTP_400_BAD_REQUEST)
+            response = ErrorResponseBuilder().with_message("You can only refer one person").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         referree = get_object_or_404(User, referral_code=referral_code)
         referral_rule = RefferalRule(user, referree)
@@ -55,14 +58,17 @@ class PointCouponAPIView(APIView):
 
         used_count = PointTransaction.objects.filter(transaction_id=coupon.id, transaction_type='COUPON').count()
         if used_count >= coupon.usage_limit:
-            return Response({'error': 'Coupon is not available'}, status=status.HTTP_400_BAD_REQUEST)
+            response = ErrorResponseBuilder().with_message("Coupon is not available").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         user_used_count = PointTransaction.objects.filter(user=request.user, transaction_id=coupon.id, transaction_type='COUPON').count()
         if user_used_count >= coupon.usage_limit_per_user:
-            return Response({'error': 'You have reached the usage limit for this coupon'}, status=status.HTTP_400_BAD_REQUEST)
+            response = ErrorResponseBuilder().with_message("You have reached the usage limit for this coupon").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
         
         if not coupon.is_valid_now:
-            return Response({'error': 'Coupon is not valid'}, status=status.HTTP_400_BAD_REQUEST)
+            response = ErrorResponseBuilder().with_message("Coupon is not valid").build()
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         PointTransaction.objects.create(user=request.user, transaction_id=coupon.id, amount=coupon.amount, transaction_type='COUPON')
         return Response({'message': 'Coupon used successfully'}, status=status.HTTP_200_OK)
