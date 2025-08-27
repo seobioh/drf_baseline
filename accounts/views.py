@@ -90,7 +90,8 @@ class ResetPasswordAPIView(APIView):
             identity_code = request.data.get("identity_code")
             if identity_code is not None:
                 port_one_response = PortOneResponse.create_from_code(identity_code, settings.PORTONE_API_SECRET)
-                user = User.objects.get(ci=port_one_response.ci)
+                ci_hash = hashlib.sha256(port_one_response.ci.encode('utf-8')).hexdigest()
+                user = User.objects.get(ci_hash=ci_hash)
 
             else:
                 serializer = VerificationCheckSerializer(data=request.data)
