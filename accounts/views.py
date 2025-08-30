@@ -253,13 +253,23 @@ class SendVerificationView(APIView):
                 if User.objects.filter(mobile=target).exists():
                     response = ErrorResponseBuilder().with_message("이미 가입된 전화번호입니다.").build()
                     return Response(response, status=status.HTTP_400_BAD_REQUEST)
-
+            
+            else:
+                if not User.objects.filter(mobile=target).exists():
+                    response = ErrorResponseBuilder().with_message("가입되지 않은 전화번호입니다.").build()
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            
             send_verification_sms(target, verification_code)     # send_verification_sms.delay(target, verification_code) for celery
 
         else:
             if check_unique:
                 if User.objects.filter(email=target).exists():
                     response = ErrorResponseBuilder().with_message("이미 가입된 이메일입니다.").build()
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+            else:
+                if not User.objects.filter(email=target).exists():
+                    response = ErrorResponseBuilder().with_message("가입되지 않은 이메일입니다.").build()
                     return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
             send_verification_email(target, verification_code)   # send_verification_email.delay(target, verification_code) for celery
