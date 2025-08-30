@@ -237,16 +237,6 @@ class SendVerificationView(APIView):
         target = serializer.validated_data['target']
         check_unique = request.data.get('check_unique')
 
-        # 6 digits random code
-        verification_code = f"{random.randint(0, 999999):06d}"
-
-        # Update or create verification record
-        verification, _ = Verification.objects.update_or_create(
-            type=type,
-            target=target,
-            defaults={'verification_code': verification_code, 'created_at': now()}
-        )
-        
         # Send verification code
         if type == 'mobile':
             if check_unique:
@@ -258,7 +248,14 @@ class SendVerificationView(APIView):
                 if not User.objects.filter(mobile=target).exists():
                     response = ErrorResponseBuilder().with_message("가입되지 않은 전화번호입니다.").build()
                     return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
+
+            # Update or create verification record
+            verification_code = f"{random.randint(0, 999999):06d}"
+            Verification.objects.update_or_create(
+                type=type,
+                target=target,
+                defaults={'verification_code': verification_code, 'created_at': now()}
+            )
             send_verification_sms(target, verification_code)     # send_verification_sms.delay(target, verification_code) for celery
 
         else:
@@ -272,6 +269,13 @@ class SendVerificationView(APIView):
                     response = ErrorResponseBuilder().with_message("가입되지 않은 이메일입니다.").build()
                     return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
+            # Update or create verification record
+            verification_code = f"{random.randint(0, 999999):06d}"
+            Verification.objects.update_or_create(
+                type=type,
+                target=target,
+                defaults={'verification_code': verification_code, 'created_at': now()}
+            )
             send_verification_email(target, verification_code)   # send_verification_email.delay(target, verification_code) for celery
 
         return Response({"code": 0, "message": "인증번호 발송 완료"}, status=status.HTTP_200_OK)
