@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'corsheaders',                  # CORS
 
     # My apps
+    'services',
     'accounts',
     'users',
 ]
