@@ -63,7 +63,7 @@ class ServicesSchema:
                 CommonExamples.success_example(
                     message="공지사항 조회 성공",
                     data={
-                        "notice": [
+                        "notices": [
                             {
                                 "id": 1,
                                 "service": "main",
@@ -132,7 +132,7 @@ class ServicesSchema:
                 CommonExamples.success_example(
                     message="이벤트 조회 성공",
                     data={
-                        "event": [
+                        "events": [
                             {
                                 "id": 1,
                                 "service": "main",
@@ -197,7 +197,7 @@ class ServicesSchema:
                 CommonExamples.success_example(
                     message="광고 조회 성공",
                     data={
-                        "ad": [
+                        "ads": [
                             {
                                 "id": 1,
                                 "service": "main",
@@ -262,7 +262,7 @@ class ServicesSchema:
                 CommonExamples.success_example(
                     message="FAQ 조회 성공",
                     data={
-                        "faq": [
+                        "faqs": [
                             {
                                 "id": 1,
                                 "service": "main",
@@ -322,7 +322,7 @@ class ServicesSchema:
                 CommonExamples.success_example(
                     message="개인정보처리방침 조회 성공",
                     data={
-                        "privacy_policy": [
+                        "privacy_policies": [
                             {
                                 "id": 1,
                                 "service": "main",
@@ -381,7 +381,7 @@ class ServicesSchema:
                 CommonExamples.success_example(
                     message="이용약관 조회 성공",
                     data={
-                        "term": [
+                        "terms": [
                             {
                                 "id": 1,
                                 "service": "main",

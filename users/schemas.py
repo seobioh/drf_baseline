@@ -63,7 +63,7 @@ class UserSchema:
                 CommonExamples.success_example(
                     message="추천인 조회 성공",
                     data={
-                        "referral": {
+                        "referrals": {
                             "referrals_given": [
                                 {
                                     "id": 1,
@@ -184,7 +184,7 @@ class UserSchema:
                 CommonExamples.success_example(
                     message="포인트 내역 조회 성공",
                     data={
-                        "point_transaction": [
+                        "point_transactions": [
                             {
                                 "id": 1,
                                 "user": 1,

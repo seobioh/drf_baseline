@@ -25,7 +25,7 @@ class NoticeAPIView(APIView):
             notices = Notice.objects.filter(is_active=True).order_by('-created_at')
         
         serializer = NoticeSerializer(notices, many=True)
-        response = SuccessResponseBuilder().with_message("공지사항 조회 성공").with_data({"notice": serializer.data}).build()
+        response = SuccessResponseBuilder().with_message("공지사항 조회 성공").with_data({"notices": serializer.data}).build()
         return Response(response, status=status.HTTP_200_OK)
 
 
@@ -48,7 +48,7 @@ class EventAPIView(APIView):
             events = Event.objects.filter(is_active=True).order_by('-created_at')
         
         serializer = EventSerializer(events, many=True)
-        response = SuccessResponseBuilder().with_message("이벤트 조회 성공").with_data({"event": serializer.data}).build()
+        response = SuccessResponseBuilder().with_message("이벤트 조회 성공").with_data({"events": serializer.data}).build()
         return Response(response, status=status.HTTP_200_OK)
 
 
@@ -71,7 +71,7 @@ class AdAPIView(APIView):
             ads = Ad.objects.filter(is_active=True).order_by('-created_at')
         
         serializer = AdSerializer(ads, many=True)
-        response = SuccessResponseBuilder().with_message("광고 조회 성공").with_data({"ad": serializer.data}).build()
+        response = SuccessResponseBuilder().with_message("광고 조회 성공").with_data({"ads": serializer.data}).build()
         return Response(response, status=status.HTTP_200_OK)
 
 
@@ -94,7 +94,7 @@ class FAQAPIView(APIView):
             faqs = FAQ.objects.filter(is_active=True).order_by('service', 'order')
         
         serializer = FAQSerializer(faqs, many=True)
-        response = SuccessResponseBuilder().with_message("FAQ 조회 성공").with_data({"faq": serializer.data}).build()
+        response = SuccessResponseBuilder().with_message("FAQ 조회 성공").with_data({"faqs": serializer.data}).build()
         return Response(response, status=status.HTTP_200_OK)
 
 
@@ -117,7 +117,7 @@ class PrivacyPolicyAPIView(APIView):
             privacys = PrivacyPolicy.objects.filter(is_active=True).order_by('service', 'order')
         
         serializer = PrivacyPolicySerializer(privacys, many=True)
-        response = SuccessResponseBuilder().with_message("개인정보처리방침 조회 성공").with_data({"privacy_policy": serializer.data}).build()
+        response = SuccessResponseBuilder().with_message("개인정보처리방침 조회 성공").with_data({"privacy_policies": serializer.data}).build()
         return Response(response, status=status.HTTP_200_OK)
 
 
@@ -140,7 +140,7 @@ class TermAPIView(APIView):
             terms = Term.objects.filter(is_active=True).order_by('service', 'order')
         
         serializer = TermSerializer(terms, many=True)
-        response = SuccessResponseBuilder().with_message("이용약관 조회 성공").with_data({"term": serializer.data}).build()
+        response = SuccessResponseBuilder().with_message("이용약관 조회 성공").with_data({"terms": serializer.data}).build()
         return Response(response, status=status.HTTP_200_OK)
 
 

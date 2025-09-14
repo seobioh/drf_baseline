@@ -31,7 +31,7 @@ class ReferralAPIView(APIView):
             'referrals_received': ReferralSerializer(referrals_received, many=True).data,
         }
         
-        response = SuccessResponseBuilder().with_message("추천인 조회 성공").with_data({"referral": data}).build()
+        response = SuccessResponseBuilder().with_message("추천인 조회 성공").with_data({"referrals": data}).build()
         return Response(response, status=status.HTTP_200_OK)
 
 
@@ -89,5 +89,5 @@ class PointTransactionAPIView(APIView):
     @extend_schema(**UserSchema.get_point_transactions())
     def get(self, request):
         transactions = PointTransaction.objects.filter(user=request.user)
-        response = SuccessResponseBuilder().with_message("포인트 내역 조회 성공").with_data({"point_transaction": PointTransactionSerializer(transactions, many=True).data}).build()
+        response = SuccessResponseBuilder().with_message("포인트 내역 조회 성공").with_data({"point_transactions": PointTransactionSerializer(transactions, many=True).data}).build()
         return Response(response, status=status.HTTP_200_OK)
