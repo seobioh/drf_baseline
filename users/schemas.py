@@ -68,7 +68,9 @@ class UserSchema:
                                 {
                                     "id": 1,
                                     "referrer": 1,
+                                    "referrer_username": "referrer_username",
                                     "referree": 2,
+                                    "referree_username": "referree_username",
                                     "created_at": "2024-01-01T00:00:00Z"
                                 }
                             ],
@@ -76,7 +78,9 @@ class UserSchema:
                                 {
                                     "id": 2,
                                     "referrer": 3,
+                                    "referrer_username": "referrer_username",
                                     "referree": 1,
+                                    "referree_username": "referree_username",
                                     "created_at": "2024-01-01T00:00:00Z"
                                 }
                             ]
@@ -109,7 +113,9 @@ class UserSchema:
                         "referral": {
                             "id": 1,
                             "referrer": 1,
+                            "referrer_username": "referrer_username",
                             "referree": 2,
+                            "referree_username": "referree_username",
                             "created_at": "2024-01-01T00:00:00Z"
                         }
                     }
@@ -185,6 +191,7 @@ class UserSchema:
                                 "transaction_id": 1,
                                 "amount": 1000,
                                 "transaction_type": "COUPON",
+                                "description": "쿠폰 사용",
                                 "created_at": "2024-01-01T00:00:00Z"
                             },
                             {
@@ -193,6 +200,7 @@ class UserSchema:
                                 "transaction_id": 2,
                                 "amount": 500,
                                 "transaction_type": "REFERRAL",
+                                "description": "추천 등록",
                                 "created_at": "2024-01-01T00:00:00Z"
                             }
                         ]
