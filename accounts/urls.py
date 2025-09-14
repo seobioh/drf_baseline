@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.urls import path
 
 from .views import AccountAPIView, SignUpAPIView, CheckEmailAPIView, ResetPasswordAPIView, TokenRefreshAPIView, SendVerificationView, CheckVerificationView
-from .views import NaverAPIView, GoogleAPIView, KakaoAPIView, AppleAPIView, PassRequestAPIView, PassAPIView, PortOneAPIView
+from .views import NaverAPIView, GoogleAPIView, KakaoAPIView, AppleAPIView, PortOneAPIView
 
 urlpatterns = [
     path("", AccountAPIView.as_view()),
@@ -21,7 +21,5 @@ urlpatterns = [
     path("/kakao", KakaoAPIView.as_view()),
     path("/apple", AppleAPIView.as_view()),
 
-    path("/pass/request", PassRequestAPIView.as_view()),
-    path("/pass", PassAPIView.as_view()),
     path("/portone", PortOneAPIView.as_view()),
 ]

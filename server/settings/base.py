@@ -16,18 +16,17 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+# Disable trailing slash
 APPEND_SLASH = False
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
+# Load environment variables
 dotenv.load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -40,6 +39,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',     # JWT
     'corsheaders',                  # CORS
+    'drf_spectacular',              # Swagger
 
     # My apps
     'services',
@@ -47,12 +47,15 @@ INSTALLED_APPS = [
     'users',
 ]
 
+
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',)     # JWT
+    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),   # JWT
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",                                       # Swagger
+    'EXCEPTION_HANDLER': 'server.exceptions.custom_exception_handler',                                  # Custom Exception Handler
 }
 
-# JWT
 
+# JWT
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -85,6 +88,15 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
 
+
+# Swagger
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'API',
+    'DESCRIPTION': 'API',
+    'VERSION': '1.0.0',
+}
+
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -96,7 +108,9 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+
 ROOT_URLCONF = 'server.urls'
+
 
 TEMPLATES = [
     {
@@ -116,8 +130,6 @@ TEMPLATES = [
 
 
 # Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -141,7 +153,6 @@ DATABASES = {
 
 
 # EMAIL
-
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
@@ -152,13 +163,11 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 
 
 # Celery
-
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
 
 # Social
-
 NAVER_CLIENT_ID = os.getenv('NAVER_CLIENT_ID')
 NAVER_CLIENT_SECRET = os.getenv('NAVER_CLIENT_SECRET')
 NAVER_CALLBACK_URI = os.getenv('NAVER_CALLBACK_URI')
@@ -170,7 +179,6 @@ GOOGLE_CALLBACK_URI = os.getenv('GOOGLE_CALLBACK_URI')
 
 
 # Authentication
-
 NICE_CLIENT_ID = os.getenv('NICE_CLIENT_ID')
 NICE_ACCESS_TOKEN = os.getenv('NICE_ACCESS_TOKEN')
 NICE_SERVER_URI = os.getenv('NICE_SERVER_URI')
@@ -178,12 +186,11 @@ NICE_PRODUCT_ID = os.getenv('NICE_PRODUCT_ID')
 PORTONE_API_SECRET = os.getenv('PORTONE_API_SECRET')
 
 
+# Authenticaion User Model
 AUTH_USER_MODEL = 'accounts.User'
 
 
 # Password validation
-# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -201,24 +208,16 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
-
 LANGUAGE_CODE = 'ko-kr'
-
 TIME_ZONE = 'Asia/Seoul'
-
 USE_I18N = True
-
 USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-
 STATIC_URL = 'static/'
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
+# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

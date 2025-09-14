@@ -1,19 +1,45 @@
 # accounts/utils.py
 app_name = 'accounts'
 
-import time
-import json
-import hmac
-import base64
 import string
-import random
-import hashlib
 import secrets
 import requests
 import urllib.parse
 
-from datetime import datetime
-from Crypto.Cipher import AES
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+from .serializers import UserSerializer
+
+# Auth Response Builder
+class AuthResponseBuilder:
+    def __init__(self, user):
+        self.user = user
+        self.message = "Success"
+        self.code = 0
+
+    def with_message(self, message: str):
+        self.message = message
+        return self
+
+    def with_code(self, code: int):
+        self.code = code
+        return self
+
+    def build(self) -> dict:
+        token = TokenObtainPairSerializer.get_token(self.user)
+        return {
+            "code": self.code,
+            "message": self.message,
+            "data": {
+                "user": UserSerializer(self.user).data,
+                "token": {
+                    "access_token": str(token.access_token),
+                    "refresh_token": str(token),
+                    "expires_in": token.access_token.lifetime.total_seconds(),
+                },
+            },
+        }
+
 
 # Password Generator
 # <-------------------------------------------------------------------------------------------------------------------------------->
@@ -454,263 +480,6 @@ class KakaoResponse:
             raise ValueError("Invalid response from Kakao")
         
         return kakao_response
-
-
-class PassRequest:
-    def __init__(self, data):
-        self.data = data
-    
-    @property
-    def req_no(self):
-        return self.data.get('req_no')
-    
-    @property
-    def req_dtim(self):
-        return self.data.get('req_dtim')
-    
-    @property
-    def token_val(self):
-        return self.data.get('token_val')
-    
-    @property
-    def result_val(self):
-        return self.data.get('resultVal')
-    
-    @property
-    def key(self):
-        return self.data.get('key')
-    
-    @property
-    def iv(self):
-        return self.data.get('iv')
-    
-    @property
-    def hmac_key(self):
-        return self.data.get('hmac_key')
-    
-    @property
-    def plain(self):
-        return self.data.get('plain')
-    
-    @property
-    def token_version_id(self):
-        return self.data.get('token_version_id')
-    
-    @property
-    def enc_data(self):
-        return self.data.get('enc_data')
-    
-    @property
-    def integrity(self):
-        return self.data.get('integrity')
-    
-    @property
-    def is_valid(self):
-        return bool(
-            self.req_no and 
-            self.token_version_id and 
-            self.enc_data and 
-            self.integrity
-        )
-    
-    def to_frontend_data(self):
-        return {
-            'req_no': self.req_no,
-            'req_dtim': self.req_dtim,
-            'token_version_id': self.token_version_id,
-            'enc_data': self.enc_data,
-            'integrity_value': self.integrity,
-            'nice_server_url': 'https://nice.checkplus.co.kr/CheckPlusSafeModel/service.cb'
-        }
-    
-    def to_session_data(self):
-        return {
-            'token_version_id': self.token_version_id,
-            'req_no': self.req_no,
-            'key': self.key,
-            'iv': self.iv,
-            'hmac_key': self.hmac_key
-        }
-    
-    def debug_print(self):
-        return f"PassRequest(req_no={self.req_no}, token_version_id={self.token_version_id}, is_valid={self.is_valid})"
-    
-    @classmethod
-    def create_from_nice_api(cls, nice_access_token, nice_client_id, nice_product_id, nice_server_uri):
-        # 1. 요청 데이터 생성
-        now = str(int(time.time()))
-        req_dtim = datetime.now().strftime('%Y%m%d%H%M%S')
-        req_no = f"REQ{req_dtim}{str(random.randint(0, 10000)).zfill(4)}"
-        
-        # 2. NICE API 호출
-        url = "https://svc.niceapi.co.kr:22001/digital/niceid/api/v1.0/common/crypto/token"
-        auth = f"{nice_access_token}:{now}:{nice_client_id}"
-        base64_auth = base64.b64encode(auth.encode('utf-8')).decode('utf-8')
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'bearer {base64_auth}',
-            'productID': nice_product_id
-        }
-        
-        data = {
-            "dataHeader": {
-                "CNTY_CD": "ko",
-                "TRAN_ID": ""
-            },
-            "dataBody": {
-                "req_dtim": req_dtim,
-                "req_no": req_no,
-                "enc_mode": "1"
-            }
-        }
-        
-        response = requests.post(url, data=json.dumps(data), headers=headers)
-        response_data = response.json()["dataBody"]
-        
-        site_code = response_data["site_code"]
-        token_version_id = response_data["token_version_id"]
-        token_val = response_data["token_val"]
-        
-        # 3. 암호화 키 생성
-        result = f"{req_dtim}{req_no}{token_val}"
-        result_val = base64.b64encode(hashlib.sha256(result.encode()).digest()).decode('utf-8')
-        
-        key = result_val[:16]
-        iv = result_val[-16:]
-        hmac_key = result_val[:32]
-        
-        # 4. 평문 데이터 생성
-        plain_data = json.dumps({
-            "requestno": req_no,
-            "returnurl": nice_server_uri,
-            "sitecode": site_code
-        })
-        
-        # 5. 데이터 암호화
-        enc_data = cls.encrypt_data(plain_data, key, iv)
-        
-        # 6. 무결성 값 생성
-        h = hmac.new(
-            key=hmac_key.encode(), 
-            msg=enc_data.encode('utf-8'), 
-            digestmod=hashlib.sha256
-        ).digest()
-        integrity_value = base64.b64encode(h).decode('utf-8')
-        
-        # 7. PassResponse 객체 생성
-        render_params = {
-            'req_no': req_no,
-            'req_dtim': req_dtim,
-            'token_val': token_val,
-            'resultVal': result_val,
-            'key': key,
-            'iv': iv,
-            'hmac_key': hmac_key,
-            'plain': plain_data,
-            'token_version_id': token_version_id,
-            'enc_data': enc_data,
-            'integrity': integrity_value
-        }
-        
-        return cls(render_params)
-    
-    @staticmethod
-    def encrypt_data(plain_data, key, iv):
-        block_size = 16
-        pad = lambda s: s + (block_size - len(s) % block_size) * chr(block_size - len(s) % block_size)
-        cipher = AES.new(key.encode("utf8"), AES.MODE_CBC, iv.encode("utf8"))
-        return base64.b64encode(cipher.encrypt(pad(plain_data).encode('utf-8'))).decode('utf-8')
-
-
-class PassResponse:
-    def __init__(self, data):
-        self.data = data
-    
-    @property
-    def req_no(self):
-        return self.data.get('req_no')
-    
-    @property
-    def token_version_id(self):
-        return self.data.get('token_version_id')
-    
-    @property
-    def enc_data(self):
-        return self.data.get('enc_data')
-    
-    @property
-    def integrity_value(self):
-        return self.data.get('integrity_value')
-    
-    @property
-    def is_valid(self):
-        return bool(
-            self.req_no and 
-            self.token_version_id and 
-            self.enc_data and 
-            self.integrity_value
-        )
-    
-    def parse_user_data(self, key, iv):
-        try:
-            # 데이터 복호화
-            decrypted_data = self.decrypt_data(self.enc_data, key, iv)
-            user_data = json.loads(decrypted_data)
-            
-            # 사용자 정보 추출
-            parsed_data = {
-                'name': user_data.get('name', ''),
-                'birthdate': user_data.get('birthdate', ''),
-                'gender': user_data.get('gender', ''),
-                'mobile': user_data.get('mobile', ''),
-                'ci': user_data.get('ci', ''),
-                'di': user_data.get('di', ''),
-                'auth_type': user_data.get('authtype', ''),
-                'auth_date': user_data.get('authdate', ''),
-                'auth_time': user_data.get('authtime', ''),
-                'req_no': self.req_no,
-                'token_version_id': self.token_version_id
-            }
-            
-            return parsed_data
-            
-        except Exception as e:
-            raise ValueError(f"사용자 데이터 파싱 실패: {str(e)}")
-    
-    @staticmethod
-    def decrypt_data(enc_data, key, iv):
-        encryptor = AES.new(key.encode('utf-8'), AES.MODE_CBC, iv.encode('utf-8'))
-        unpad = lambda s: s[0:-ord(s[-1:])]
-        return unpad(encryptor.decrypt(base64.b64decode(enc_data))).decode('euc-kr')
-    
-    def to_user_data(self):
-        return {
-            'name': '',
-            'birthdate': '',
-            'gender': '',
-            'mobile': '',
-            'ci': '',
-            'di': '',
-            'auth_type': '',
-            'auth_date': '',
-            'auth_time': '',
-            'req_no': self.req_no,
-            'token_version_id': self.token_version_id
-        }
-    
-    def debug_print(self):
-        return f"PassResponse(req_no={self.req_no}, token_version_id={self.token_version_id}, is_valid={self.is_valid})"
-    
-    @classmethod
-    def create_from_request_data(cls, req_no, token_version_id, enc_data, integrity_value):
-        data = {
-            'req_no': req_no,
-            'token_version_id': token_version_id,
-            'enc_data': enc_data,
-            'integrity_value': integrity_value
-        }
-        return cls(data)
 
 
 class PortOneResponse:

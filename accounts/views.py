@@ -12,26 +12,30 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
 from django.db import IntegrityError
 
+from drf_spectacular.utils import extend_schema
+
 from users.rules import RefferalRule
-from server.utils import ErrorResponseBuilder
+from server.utils import SuccessResponseBuilder, ErrorResponseBuilder
 
 from .task import send_verification_email, send_verification_sms
-from .utils import NaverResponse, KakaoResponse, GoogleResponse, PassRequest, PassResponse, PortOneResponse
-from .models import User, Verification, UserSocialAccount, PassVerification
+from .utils import AuthResponseBuilder, NaverResponse, KakaoResponse, GoogleResponse, PortOneResponse
+from .models import User, Verification, UserSocialAccount
 from .serializers import UserSerializer, SignUpSerializer, VerificationCheckSerializer, VerificationRequestSerializer, SocialSignUpSerializer
 from .permissions import IsAuthenticated, AllowAny
+from .schemas import AccountSchema
 
 # User
 # <-------------------------------------------------------------------------------------------------------------------------------->
 # Sign Up API
 class SignUpAPIView(APIView):
+    @extend_schema(**AccountSchema.signup())
     def post(self, request):
         serializer = SignUpSerializer(data=request.data)
         if serializer.is_valid():                
@@ -54,7 +58,7 @@ class SignUpAPIView(APIView):
 
                 except Exception as error:
                     user.delete()
-                    response = ErrorResponseBuilder().with_message("User Verification failed").with_errors({"error": str(error)}).build()
+                    response = ErrorResponseBuilder().with_message("사용자 인증에 실패했습니다.").with_errors({"error": str(error)}).build()
                     return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
             referral_code = request.data.get("referral_code")
@@ -64,27 +68,30 @@ class SignUpAPIView(APIView):
                     referral_rule = RefferalRule(user, referree)
                     referral_rule.create()
 
-            response = AuthResponseBuilder(user).with_message("Register successful").build()
+            response = AuthResponseBuilder(user).with_message("회원가입 성공").build()
             return Response(response, status=status.HTTP_200_OK)
         
         else:
-            response = ErrorResponseBuilder().with_message("Signup failed").with_errors(serializer.errors).build()
+            response = ErrorResponseBuilder().with_message("회원가입에 실패했습니다.").with_errors(serializer.errors).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Check Email API
 class CheckEmailAPIView(APIView):
+    @extend_schema(**AccountSchema.check_email())
     def post(self, request):
         email = request.data.get("email")
         if User.objects.filter(email=email).exists():
             response = ErrorResponseBuilder().with_message("이미 가입된 이메일입니다.").build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
         else:
-            return Response({"code": 0, "message": "사용 가능한 이메일입니다."}, status=status.HTTP_200_OK)
+            response = SuccessResponseBuilder().with_message("사용 가능한 이메일입니다.").build()
+            return Response(response, status=status.HTTP_200_OK)
 
 
 # Reset Password API
 class ResetPasswordAPIView(APIView):
+    @extend_schema(**AccountSchema.reset_password())
     def post(self, request):
         try:    
             identity_code = request.data.get("identity_code")
@@ -102,7 +109,7 @@ class ResetPasswordAPIView(APIView):
                 verification = Verification.objects.get(target=target, verification_code=verification_code)
 
                 if verification.is_expired():
-                    response = ErrorResponseBuilder().with_message("인증번호 만료").build()
+                    response = ErrorResponseBuilder().with_message("인증번호가 만료되었습니다.").build()
                     return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
                 if verification.type == 'mobile':
@@ -113,24 +120,25 @@ class ResetPasswordAPIView(APIView):
 
                 verification.delete()
 
-            response = AuthResponseBuilder(user).with_message("Verification successful").build()
+            response = AuthResponseBuilder(user).with_message("임시 토큰 발급 성공").build()
             return Response(response, status=status.HTTP_200_OK)
 
         except User.DoesNotExist:
-            response = ErrorResponseBuilder().with_message("User not found").build()
+            response = ErrorResponseBuilder().with_message("사용자를 찾을 수 없습니다.").build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         except Verification.DoesNotExist:
-            response = ErrorResponseBuilder().with_message("인증번호 불일치").build()
+            response = ErrorResponseBuilder().with_message("인증번호가 일치하지 않습니다.").build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            response = ErrorResponseBuilder().with_message("처리 중 오류가 발생했습니다").with_errors({"error": str(e)}).build()
+            response = ErrorResponseBuilder().with_message("처리 중 오류가 발생했습니다.").with_errors({"error": str(e)}).build()
             return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # Token Refresh API
 class TokenRefreshAPIView(APIView):
+    @extend_schema(**AccountSchema.token_refresh())
     def post(self, request):
         refresh_token = request.data.get("refresh_token")
         serializer = TokenRefreshSerializer(data={"refresh": refresh_token})
@@ -146,15 +154,17 @@ class TokenRefreshAPIView(APIView):
             user.last_access = now()
             user.save(update_fields=["last_access"])
             
-            response = {
-                "code": 0,
-                "access_token": access_token,
-                "expires_in": access_token_lifetime
-            }
+            response = SuccessResponseBuilder().with_message("토큰 갱신 성공").with_data({
+                "token": {
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "expires_in": access_token_lifetime
+                }
+            }).build()
             return Response(response, status=status.HTTP_200_OK)
 
         except TokenError as error:
-            response = ErrorResponseBuilder().with_message("Authentication failed").with_errors({"token_error": str(error)}).build()
+            response = ErrorResponseBuilder().with_message("토큰 갱신에 실패했습니다.").with_errors({"token_error": str(error)}).build()
             return Response(response, status=status.HTTP_401_UNAUTHORIZED)
     
 
@@ -169,38 +179,39 @@ class AccountAPIView(APIView):
         return super().get_permissions()
     
     # Get Account Info (Authenticated Users Only)
+    @extend_schema(**AccountSchema.get_account_info())
     def get(self, request):
         user = request.user
         user.last_access = now()
         user.save(update_fields=["last_access"])
-        response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+        response = AuthResponseBuilder(user).with_message("로그인 성공").build()
         return Response(response, status=status.HTTP_200_OK)
         
     # Sign-In API (Issue JWT Token)
+    @extend_schema(**AccountSchema.signin())
     def post(self, request):
         user = authenticate(email=request.data.get("email"), password=request.data.get("password"))
         if user is not None:
             user.last_access = now()
             user.save(update_fields=["last_access"])
-            response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+            response = AuthResponseBuilder(user).with_message("로그인 성공").build()
             return Response(response, status=status.HTTP_200_OK)
         
         else:
-            response = ErrorResponseBuilder().with_message("Invalid credentials. Please try again.").with_errors({"non_field_errors": ["Invalid email or password."]}).build()
+            response = ErrorResponseBuilder().with_message("잘못된 인증 정보입니다. 다시 시도해주세요.").with_errors({"non_field_errors": ["잘못된 이메일 또는 비밀번호입니다."]}).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
         
     # Delete Account API
+    @extend_schema(**AccountSchema.delete_account())
     def delete(self, request):
         user = request.user  # Authenticated user
         user.delete()
 
-        response = {
-            "code": 0,
-            "message": "Account deleted successfully"
-        }
+        response = SuccessResponseBuilder().with_message("계정 삭제 성공").build()
         return Response(response, status=status.HTTP_202_ACCEPTED)
         
     # Update Account Info API
+    @extend_schema(**AccountSchema.update_account())
     def put(self, request):
         user = request.user  # Authenticated user
         serializer = UserSerializer(instance=user, data=request.data, partial=True)
@@ -208,15 +219,11 @@ class AccountAPIView(APIView):
             serializer.save(last_access=now())
             updated_user = serializer.data
 
-            response = {
-                "code": 0,
-                "message": "User information updated successfully",
-                "user": updated_user,
-            }
+            response = SuccessResponseBuilder().with_message("사용자 정보 수정 성공").with_data({"user": updated_user}).build()
             return Response(response, status=status.HTTP_200_OK)
         
         else:
-            response = ErrorResponseBuilder().with_message("Validation failed").with_errors(serializer.errors).build()
+            response = ErrorResponseBuilder().with_message("사용자 정보 수정에 실패했습니다.").with_errors(serializer.errors).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -224,13 +231,14 @@ class AccountAPIView(APIView):
 # <-------------------------------------------------------------------------------------------------------------------------------->
 # Send Verification Code API
 class SendVerificationView(APIView):
+    @extend_schema(**AccountSchema.request_verification())
     def post(self, request):
         serializer = VerificationRequestSerializer(data=request.data)
         try:
             serializer.is_valid(raise_exception=True)
 
         except Exception as e:
-            response = ErrorResponseBuilder().with_message("유효성 검사 실패").with_errors(serializer.errors).build()
+            response = ErrorResponseBuilder().with_message("인증번호 요청에 실패했습니다.").with_errors(serializer.errors).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         type = serializer.validated_data['type']
@@ -278,17 +286,19 @@ class SendVerificationView(APIView):
             )
             send_verification_email(target, verification_code)   # send_verification_email.delay(target, verification_code) for celery
 
-        return Response({"code": 0, "message": "인증번호 발송 완료"}, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("인증번호 발송 완료").build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 # Check Verification Code API
 class CheckVerificationView(APIView):
+    @extend_schema(**AccountSchema.check_verification())
     def post(self, request):
         serializer = VerificationCheckSerializer(data=request.data)
         try:
             serializer.is_valid(raise_exception=True)
         except Exception as e:
-            response = ErrorResponseBuilder().with_message("유효성 검사 실패").with_errors(serializer.errors).build()
+            response = ErrorResponseBuilder().with_message("인증번호 확인에 실패했습니다.").with_errors(serializer.errors).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
         target = serializer.validated_data['target']
         verification_code = serializer.validated_data['verification_code']
@@ -297,20 +307,22 @@ class CheckVerificationView(APIView):
         try:
             verification = Verification.objects.get(target=target, verification_code=verification_code)
         except Verification.DoesNotExist:
-            response = ErrorResponseBuilder().with_message("인증번호 불일치").build()
+            response = ErrorResponseBuilder().with_message("인증번호가 일치하지 않습니다.").build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         if verification.is_expired():
-            response = ErrorResponseBuilder().with_message("인증번호 만료").build()
+            response = ErrorResponseBuilder().with_message("인증번호가 만료되었습니다.").build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"code": 0, "message": "인증 성공"}, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("인증 성공").build()
+        return Response(response, status=status.HTTP_200_OK)
     
 
 # Social API
 # <-------------------------------------------------------------------------------------------------------------------------------->
 # Naver API
 class NaverAPIView(APIView):
+    @extend_schema(**AccountSchema.naver_auth())
     def post(self, request):
         code = request.data.get("code")
         state = request.data.get("state")
@@ -324,7 +336,7 @@ class NaverAPIView(APIView):
             user = social_account.user
             user.last_access = now()
             user.save(update_fields=["last_access"])
-            response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+            response = AuthResponseBuilder(user).with_message("네이버 로그인 성공").build()
             return Response(response, status=status.HTTP_200_OK)
 
         # 2. 없으면 회원가입 처리
@@ -333,20 +345,21 @@ class NaverAPIView(APIView):
             serializer = SocialSignUpSerializer(data=user_data)
             if serializer.is_valid():
                 user = serializer.save()
-                response = AuthResponseBuilder(user).with_message("Register & Sign In successful").build()
+                response = AuthResponseBuilder(user).with_message("회원가입 성공").build()
                 return Response(response, status=status.HTTP_200_OK)
 
             else:
-                response = ErrorResponseBuilder().with_message("Social sign in failed").with_errors(serializer.errors).build()
+                response = ErrorResponseBuilder().with_message("네이버 회원가입에 실패했습니다.").with_errors(serializer.errors).build()
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
             
         except ValueError as error:
-            response = ErrorResponseBuilder().with_message("네이버 로그인 실패").with_errors({"error": str(error)}).build()
+            response = ErrorResponseBuilder().with_message("네이버 로그인에 실패했습니다.").with_errors({"error": str(error)}).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Google Sign In API
 class GoogleAPIView(APIView):
+    @extend_schema(**AccountSchema.google_auth())
     def post(self, request):
         code = request.data.get("code")
         
@@ -359,7 +372,7 @@ class GoogleAPIView(APIView):
             user = social_account.user
             user.last_access = now()
             user.save(update_fields=["last_access"])
-            response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+            response = AuthResponseBuilder(user).with_message("구글 로그인 성공").build()
             return Response(response, status=status.HTTP_200_OK)
 
         # 2. 없으면 회원가입처럼 처리
@@ -368,20 +381,21 @@ class GoogleAPIView(APIView):
             serializer = SocialSignUpSerializer(data=user_data)
             if serializer.is_valid():
                 user = serializer.save()
-                response = AuthResponseBuilder(user).with_message("Register & Sign In successful").build()
+                response = AuthResponseBuilder(user).with_message("회원가입 성공").build()
                 return Response(response, status=status.HTTP_200_OK)
 
             else:
-                response = ErrorResponseBuilder().with_message("Social sign in failed").with_errors(serializer.errors).build()
+                response = ErrorResponseBuilder().with_message("구글 회원가입에 실패했습니다.").with_errors(serializer.errors).build()
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
             
         except ValueError as error:
-            response = ErrorResponseBuilder().with_message("구글 로그인 실패").with_errors({"error": str(error)}).build()
+            response = ErrorResponseBuilder().with_message("구글 로그인에 실패했습니다.").with_errors({"error": str(error)}).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Kakao Sign In API
 class KakaoAPIView(APIView):
+    @extend_schema(**AccountSchema.kakao_auth())
     def post(self, request):
         code = request.data.get("code")
         
@@ -394,7 +408,7 @@ class KakaoAPIView(APIView):
             user = social_account.user
             user.last_access = now()
             user.save(update_fields=["last_access"])
-            response = AuthResponseBuilder(user).with_message("Sign In successful").build()
+            response = AuthResponseBuilder(user).with_message("카카오 로그인 성공").build()
             return Response(response, status=status.HTTP_200_OK)
 
         # 2. 없으면 회원가입처럼 처리
@@ -403,123 +417,37 @@ class KakaoAPIView(APIView):
             serializer = SocialSignUpSerializer(data=user_data)
             if serializer.is_valid():
                 user = serializer.save()
-                response = AuthResponseBuilder(user).with_message("Register & Sign In successful").build()
+                response = AuthResponseBuilder(user).with_message("회원가입 성공").build()
                 return Response(response, status=status.HTTP_200_OK)
 
             else:
-                response = ErrorResponseBuilder().with_message("Social sign in failed").with_errors(serializer.errors).build()
+                response = ErrorResponseBuilder().with_message("카카오 회원가입에 실패했습니다.").with_errors(serializer.errors).build()
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
             
         except ValueError as error:
-            response = ErrorResponseBuilder().with_message("카카오 로그인 실패").with_errors({"error": str(error)}).build()
+            response = ErrorResponseBuilder().with_message("카카오 로그인에 실패했습니다.").with_errors({"error": str(error)}).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Apple Sign In API
 class AppleAPIView(APIView):
+    @extend_schema(**AccountSchema.apple_auth())
     def post(self, request):
         pass
 
 
 # Authentication API
 # <-------------------------------------------------------------------------------------------------------------------------------->
-# PASS Authentication API
-class PassRequestAPIView(APIView):
-    def get(self, request):
-        try:
-            pass_response = PassRequest.create_from_nice_api(settings.NICE_ACCESS_TOKEN, settings.NICE_CLIENT_ID, settings.NICE_PRODUCT_ID, settings.NICE_SERVER_URI)
-            
-            if not pass_response.is_valid:
-                response = ErrorResponseBuilder().with_message("NICE API 응답이 유효하지 않습니다.").build()
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
-            # DB에 인증 데이터 저장, 기존 데이터가 있으면 삭제 (req_no는 unique)
-            PassVerification.objects.filter(req_no=pass_response.req_no).delete()
-            PassVerification.objects.create(
-                req_no=pass_response.req_no,
-                token_version_id=pass_response.token_version_id,
-                key=pass_response.key,
-                iv=pass_response.iv,
-                hmac_key=pass_response.hmac_key
-            )
-            
-            # 프론트엔드에 전달할 데이터
-            frontend_data = pass_response.to_frontend_data()
-            
-            return Response({
-                'code': 0,
-                'message': '본인인증 데이터가 생성되었습니다.',
-                'data': frontend_data
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as error:
-            response = ErrorResponseBuilder().with_message('본인인증 데이터 생성 중 오류가 발생했습니다').with_errors({"error": str(error)}).build()
-            return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-# PASS CI API
-class PassAPIView(APIView):
-    def post(self, request):
-        try:
-            req_no = request.data.get('req_no')
-            token_version_id = request.data.get('token_version_id')
-            enc_data = request.data.get('enc_data')
-            integrity_value = request.data.get('integrity_value')
-            
-            if not all([req_no, token_version_id, enc_data, integrity_value]):
-                response = ErrorResponseBuilder().with_message("필수 파라미터가 누락되었습니다.").with_errors({
-                    "missing_fields": ["req_no", "token_version_id", "enc_data", "integrity_value"]
-                }).build()
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
-            pass_verification = PassVerification.objects.get(req_no=req_no, token_version_id=token_version_id)
-            if pass_verification.is_expired():
-                response = ErrorResponseBuilder().with_message("인증 요청이 만료되었습니다.").build()
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-
-            if pass_verification.is_verified:
-                response = ErrorResponseBuilder().with_message("이미 인증이 완료된 요청입니다.").build()
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
-            # 무결성 검증 (HMAC)
-            h = hmac.new(key=pass_verification.hmac_key.encode(), msg=enc_data.encode('utf-8'), digestmod=hashlib.sha256).digest()
-            calculated_integrity = base64.b64encode(h).decode('utf-8')
-            if calculated_integrity != integrity_value:
-                response = ErrorResponseBuilder().with_message("무결성 검증에 실패했습니다.").build()
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
-            pass_response = PassResponse.create_from_request_data(req_no=req_no, token_version_id=token_version_id, enc_data=enc_data, integrity_value=integrity_value)
-            user_data = pass_response.parse_user_data(key=pass_verification.key, iv=pass_verification.iv)
-            pass_verification.mark_as_verified()
-            
-            response = {
-                'code': 0,
-                'message': '본인인증이 완료되었습니다.',
-                'data': {
-                    'req_no': req_no,
-                    'user_data': user_data
-                }
-            }
-            return Response(response, status=status.HTTP_200_OK)
-
-        except PassVerification.DoesNotExist:
-            response = ErrorResponseBuilder().with_message("유효하지 않은 인증 요청입니다.").build()
-            return Response(response, status=status.HTTP_400_BAD_REQUEST)
-
-        except Exception as error:
-            response = ErrorResponseBuilder().with_message('본인인증 처리 중 오류가 발생했습니다').with_errors({"error": str(error)}).build()
-            return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 # PortOne API
 class PortOneAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(**AccountSchema.portone_verification())
     def post(self, request):
         identity_code = request.data.get("identity_code")
 
         if not identity_code:
-            response = ErrorResponseBuilder().with_message("identity_code is required").build()
+            response = ErrorResponseBuilder().with_message("identity_code가 필요합니다.").build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -538,7 +466,7 @@ class PortOneAPIView(APIView):
             user.gender = port_one_response.gender
             user.save()
 
-            response = AuthResponseBuilder(user).with_message("본인인증 완료").build()
+            response = AuthResponseBuilder(user).with_message("본인인증 성공").build()
             return Response(response, status=status.HTTP_200_OK)
 
         except IntegrityError:
@@ -546,34 +474,5 @@ class PortOneAPIView(APIView):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as error:
-            response = ErrorResponseBuilder().with_message("포트원 인증 실패").with_errors({"error": str(error)}).build()
+            response = ErrorResponseBuilder().with_message("본인인증에 실패했습니다.").with_errors({"error": str(error)}).build()
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
-
-
-# Auth Response Builder
-class AuthResponseBuilder:
-    def __init__(self, user):
-        self.user = user
-        self.message = "Success"
-        self.code = 0
-
-    def with_message(self, message: str):
-        self.message = message
-        return self
-
-    def with_code(self, code: int):
-        self.code = code
-        return self
-
-    def build(self) -> dict:
-        token = TokenObtainPairSerializer.get_token(self.user)
-        return {
-            "code": self.code,
-            "user": UserSerializer(self.user).data,
-            "message": self.message,
-            "token": {
-                "access_token": str(token.access_token),
-                "refresh_token": str(token),
-                "expires_in": token.access_token.lifetime.total_seconds(),
-            },
-        }

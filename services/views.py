@@ -7,11 +7,16 @@ from rest_framework import status
 
 from django.shortcuts import get_object_or_404
 
+from drf_spectacular.utils import extend_schema
+
+from server.utils import SuccessResponseBuilder
 from .models import Notice, Event, Ad, FAQ, PrivacyPolicy, Term
 from .serializers import NoticeSerializer, EventSerializer, AdSerializer
 from .serializers import FAQSerializer, PrivacyPolicySerializer, TermSerializer
+from .schemas import ServicesSchema
 
 class NoticeAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_notices())
     def get(self, request):
         service = request.query_params.get('service')
         if service:
@@ -20,17 +25,21 @@ class NoticeAPIView(APIView):
             notices = Notice.objects.filter(is_active=True).order_by('-created_at')
         
         serializer = NoticeSerializer(notices, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("공지사항 조회 성공").with_data({"notice": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class NoticeDetailAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_notice_detail())
     def get(self, request, notice_id):
         notice = get_object_or_404(Notice, id=notice_id, is_active=True)
         serializer = NoticeSerializer(notice)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("공지사항 조회 성공").with_data({"notice": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class EventAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_events())
     def get(self, request):
         service = request.query_params.get('service')
         if service:
@@ -39,17 +48,21 @@ class EventAPIView(APIView):
             events = Event.objects.filter(is_active=True).order_by('-created_at')
         
         serializer = EventSerializer(events, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("이벤트 조회 성공").with_data({"event": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class EventDetailAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_event_detail())
     def get(self, request, event_id):
         event = get_object_or_404(Event, id=event_id, is_active=True)
         serializer = EventSerializer(event)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("이벤트 조회 성공").with_data({"event": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class AdAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_ads())
     def get(self, request):
         service = request.query_params.get('service')
         if service:
@@ -58,17 +71,21 @@ class AdAPIView(APIView):
             ads = Ad.objects.filter(is_active=True).order_by('-created_at')
         
         serializer = AdSerializer(ads, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("광고 조회 성공").with_data({"ad": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class AdDetailAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_ad_detail())
     def get(self, request, ad_id):
         ad = get_object_or_404(Ad, id=ad_id, is_active=True)
         serializer = AdSerializer(ad)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("광고 조회 성공").with_data({"ad": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class FAQAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_faqs())
     def get(self, request):
         service = request.query_params.get('service')
         if service:
@@ -77,17 +94,21 @@ class FAQAPIView(APIView):
             faqs = FAQ.objects.filter(is_active=True).order_by('service', 'order')
         
         serializer = FAQSerializer(faqs, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("FAQ 조회 성공").with_data({"faq": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class FAQDetailAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_faq_detail())
     def get(self, request, faq_id):
         faq = get_object_or_404(FAQ, id=faq_id, is_active=True)
         serializer = FAQSerializer(faq)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("FAQ 조회 성공").with_data({"faq": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class PrivacyPolicyAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_privacy_policies())
     def get(self, request):
         service = request.query_params.get('service')
         if service:
@@ -96,17 +117,21 @@ class PrivacyPolicyAPIView(APIView):
             privacys = PrivacyPolicy.objects.filter(is_active=True).order_by('service', 'order')
         
         serializer = PrivacyPolicySerializer(privacys, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("개인정보처리방침 조회 성공").with_data({"privacy_policy": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class PrivacyPolicyDetailAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_privacy_policy_detail())
     def get(self, request, privacy_policy_id):
         privacy = get_object_or_404(PrivacyPolicy, id=privacy_policy_id, is_active=True)
         serializer = PrivacyPolicySerializer(privacy)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("개인정보처리방침 조회 성공").with_data({"privacy_policy": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class TermAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_terms())
     def get(self, request):
         service = request.query_params.get('service')
         if service:
@@ -115,11 +140,14 @@ class TermAPIView(APIView):
             terms = Term.objects.filter(is_active=True).order_by('service', 'order')
         
         serializer = TermSerializer(terms, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("이용약관 조회 성공").with_data({"term": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class TermDetailAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_term_detail())
     def get(self, request, term_id):
         term = get_object_or_404(Term, id=term_id, is_active=True)
         serializer = TermSerializer(term)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response = SuccessResponseBuilder().with_message("이용약관 조회 성공").with_data({"term": serializer.data}).build()
+        return Response(response, status=status.HTTP_200_OK)
