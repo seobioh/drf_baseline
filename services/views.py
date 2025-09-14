@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 
 from server.utils import SuccessResponseBuilder
+
 from .models import Notice, Event, Ad, FAQ, PrivacyPolicy, Term
 from .serializers import NoticeSerializer, EventSerializer, AdSerializer
 from .serializers import FAQSerializer, PrivacyPolicySerializer, TermSerializer
