@@ -32,7 +32,7 @@ class AdSerializer(serializers.ModelSerializer):
         model = Ad
         fields = [
             'id', 'service', 'title', 'subtitle', 'mobile_img', 'desktop_img', 
-            'detail_img', 'description', 'link', 'start_date', 'end_date', 
+            'detail_img', 'background_img', 'description', 'link', 'start_date', 'end_date', 
             'is_active', 'created_at', 'modified_at'
         ]
         read_only_fields = ['id', 'created_at', 'modified_at']

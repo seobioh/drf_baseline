@@ -79,7 +79,7 @@ class AdAdmin(admin.ModelAdmin):
             'fields': ('service', 'title', 'subtitle', 'description')
         }),
         ('Images', {
-            'fields': ('mobile_img', 'desktop_img', 'detail_img'),
+            'fields': ('mobile_img', 'desktop_img', 'detail_img', 'background_img'),
             'classes': ('collapse',)
         }),
         ('Link', {

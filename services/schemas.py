@@ -237,6 +237,7 @@ class ServicesSchema:
                             "mobile_img": "https://example.com/mobile.jpg",
                             "desktop_img": "https://example.com/desktop.jpg",
                             "detail_img": "https://example.com/detail.jpg",
+                            "background_img": "https://example.com/background.jpg",
                             "link": "https://example.com/ad/1",
                             "start_date": "2024-01-01T00:00:00Z",
                             "end_date": "2024-01-31T23:59:59Z",
