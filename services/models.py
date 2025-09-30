@@ -164,8 +164,8 @@ class GPTPrompt(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        verbose_name = 'GPTPrompt'
-        verbose_name_plural = 'GPTPrompts'
+        verbose_name = 'GPT Prompt'
+        verbose_name_plural = 'GPT Prompts'
 
     def __str__(self):
         return f'({self.service} - {self.prompt})'
