@@ -151,3 +151,21 @@ class Term(models.Model):
 
     def __str__(self):
         return f'({self.service} - {self.subject})'
+
+
+class GPTPrompt(models.Model):
+    service = models.CharField(max_length=20, choices=Service.SERVICE_CHOICES)
+
+    prompt = models.TextField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'GPTPrompt'
+        verbose_name_plural = 'GPTPrompts'
+
+    def __str__(self):
+        return f'({self.service} - {self.prompt})'

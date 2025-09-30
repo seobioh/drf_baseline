@@ -9,3 +9,4 @@ django-cors-headers
 django-cryptography-5
 # psycopg2-binary
 drf-spectacular
+openai

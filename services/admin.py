@@ -3,7 +3,7 @@ app_name = "services"
 
 from django.contrib import admin
 
-from .models import Notice, Event, Ad, FAQ, PrivacyPolicy, Term
+from .models import Notice, Event, Ad, FAQ, PrivacyPolicy, Term, GPTPrompt
 
 @admin.register(Notice)
 class NoticeAdmin(admin.ModelAdmin):
@@ -142,6 +142,22 @@ class TermAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Basic Information', {
             'fields': ('service', 'order', 'subject', 'detail')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        })
+    )
+
+
+@admin.register(GPTPrompt)
+class GPTPromptAdmin(admin.ModelAdmin):
+    list_display = ('service', 'prompt', 'is_active', 'created_at')
+    list_filter = ('service', 'is_active', 'created_at')
+    list_editable = ('is_active',)
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('service', 'prompt')
         }),
         ('Status', {
             'fields': ('is_active',)

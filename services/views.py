@@ -11,7 +11,8 @@ from drf_spectacular.utils import extend_schema
 
 from server.utils import SuccessResponseBuilder
 
-from .models import Notice, Event, Ad, FAQ, PrivacyPolicy, Term
+from .utils import GPTService
+from .models import Notice, Event, Ad, FAQ, PrivacyPolicy, Term, GPTPrompt
 from .serializers import NoticeSerializer, EventSerializer, AdSerializer
 from .serializers import FAQSerializer, PrivacyPolicySerializer, TermSerializer
 from .schemas import ServicesSchema
@@ -152,3 +153,17 @@ class TermDetailAPIView(APIView):
         serializer = TermSerializer(term)
         response = SuccessResponseBuilder().with_message("이용약관 조회 성공").with_data({"term": serializer.data}).build()
         return Response(response, status=status.HTTP_200_OK)
+
+
+class GPTAPIView(APIView):
+    @extend_schema(**ServicesSchema.get_gpt_prompts())
+    def post(self, request, gpt_prompt_id):
+        gpt_prompt = get_object_or_404(GPTPrompt, id=gpt_prompt_id, is_active=True)
+        gpt_service = GPTService()
+        generator = gpt_service.generate_stream_response(gpt_prompt.prompt, request.data.get('message'))
+        
+        from django.http import StreamingHttpResponse
+        response = StreamingHttpResponse(generator, content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response

@@ -427,3 +427,61 @@ class ServicesSchema:
                 )
             ]
         }
+
+    @staticmethod
+    def get_gpt_prompts():
+        return {
+            'summary': "GPT 프롬프트 실행",
+            'description': "특정 GPT 프롬프트를 사용하여 스트리밍 응답을 생성합니다.",
+            'operation_id': 'services_gpt_prompts_post',
+            'request': {
+                'type': 'object',
+                'properties': {
+                    'message': {
+                        'type': 'string',
+                        'maxLength': 2000,
+                        'description': 'GPT에게 전달할 메시지',
+                        'example': '안녕하세요! 오늘 날씨가 어떤가요?'
+                    }
+                },
+                'required': ['message']
+            },
+            'responses': {
+                200: {
+                    'description': '스트리밍 응답',
+                    'content': {
+                        'text/plain': {
+                            'schema': {
+                                'type': 'string',
+                                'description': 'GPT 응답 스트림'
+                            }
+                        }
+                    }
+                },
+                404: ErrorResponseSerializer,
+                400: ErrorResponseSerializer,
+            },
+            'examples': [
+                OpenApiExample(
+                    "Request Example",
+                    summary="요청 예시",
+                    description="GPT 프롬프트 실행 요청",
+                    value={
+                        "message": "안녕하세요! 오늘 날씨가 어떤가요?"
+                    },
+                    request_only=True
+                ),
+                OpenApiExample(
+                    "Streaming Response",
+                    summary="스트리밍 응답",
+                    description="실시간으로 생성되는 GPT 응답",
+                    value="안녕하세요! 오늘은 맑은 날씨가 예상됩니다. 기온은 20도 정도로 쾌적할 것 같습니다.",
+                    response_only=True,
+                    status_codes=['200']
+                ),
+                CommonExamples.error_example(
+                    message="GPT 프롬프트를 찾을 수 없습니다.",
+                    errors={"detail": "해당 ID의 GPT 프롬프트가 존재하지 않거나 비활성화 상태입니다."}
+                )
+            ]
+        }
