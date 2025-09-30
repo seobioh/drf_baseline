@@ -2,6 +2,7 @@
 app_name = "gpts"
 
 import json
+
 from openai import OpenAI
 
 from django.conf import settings
