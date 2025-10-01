@@ -12,7 +12,7 @@ from drf_spectacular.utils import extend_schema
 from server.utils import ErrorResponseBuilder, SuccessResponseBuilder
 from accounts.models import User
 
-from .utils import RefferalHandler
+from .utils import ReferralHandler
 from .models import Referral, PointCoupon, PointTransaction
 from .permissions import IsAuthenticated
 from .serializers import ReferralSerializer, PointTransactionSerializer
@@ -50,7 +50,7 @@ class ReferralDetailAPIView(APIView):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         referree = get_object_or_404(User, referral_code=referral_code)
-        referral_handler = RefferalHandler(user, referree)
+        referral_handler = ReferralHandler(user, referree)
         referral = referral_handler.create()
         
         response = SuccessResponseBuilder().with_message("추천인 등록 성공").with_data({"referral": ReferralSerializer(referral).data}).build()

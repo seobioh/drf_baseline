@@ -21,7 +21,7 @@ from django.db import IntegrityError
 
 from drf_spectacular.utils import extend_schema
 
-from users.utils import RefferalHandler
+from users.utils import ReferralHandler
 from server.utils import SuccessResponseBuilder, ErrorResponseBuilder
 
 from .task import send_verification_email, send_verification_sms
@@ -65,7 +65,7 @@ class SignUpAPIView(APIView):
             if referral_code:
                 referree = User.objects.filter(referral_code=referral_code).first()
                 if referree:
-                    referral_handler = RefferalHandler(user, referree)
+                    referral_handler = ReferralHandler(user, referree)
                     referral_handler.create()
 
             response = AuthResponseBuilder(user).with_message("회원가입 성공").build()

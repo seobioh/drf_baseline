@@ -5,7 +5,7 @@ from django.db import transaction
 
 from .models import Referral, ReferralRule
 
-class RefferalHandler:
+class ReferralHandler:
     def __init__(self, referrer, referree):
         self.referrer = referrer
         self.referree = referree
