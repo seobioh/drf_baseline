@@ -3,13 +3,21 @@ app_name = 'users'
 
 from django.contrib import admin
 
-from .models import Referral, PointCoupon, PointTransaction
+from .models import Referral, ReferralRule, PointCoupon, PointTransaction
 
 @admin.register(Referral)
 class ReferralAdmin(admin.ModelAdmin):
     list_display = ['referrer', 'referree', 'created_at', 'modified_at', 'is_active']
     list_filter = ['is_active', 'created_at', 'modified_at']
     search_fields = ['referrer__username', 'referree__username']
+    readonly_fields = ['created_at', 'modified_at']
+
+
+@admin.register(ReferralRule)
+class ReferralRuleAdmin(admin.ModelAdmin):
+    list_display = ['user', 'name', 'description', 'created_at', 'modified_at', 'is_active']
+    list_filter = ['is_active', 'created_at', 'modified_at']
+    search_fields = ['user__username', 'name']
     readonly_fields = ['created_at', 'modified_at']
 
 

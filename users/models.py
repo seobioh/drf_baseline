@@ -27,6 +27,24 @@ class Referral(models.Model):
         return f"{self.referrer.username} -> {self.referree.username}"
 
 
+class ReferralRule(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='referral_rules')
+    name = models.CharField(max_length=20, verbose_name="Name")
+    description = models.TextField(verbose_name="Description")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        verbose_name = 'Referral Rule'
+        verbose_name_plural = 'Referral Rules'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.name}"
+
+
 class PointCoupon(models.Model):
     code = models.CharField(max_length=20, unique=True, verbose_name="Code", editable=False)
     name = models.CharField(max_length=20, verbose_name="Name")
