@@ -22,7 +22,7 @@ class PaymentAdmin(admin.ModelAdmin):
     readonly_fields = [
         'created_at', 'modified_at', 'payment_key', 'last_transaction_key'
     ]
-    autocomplete_fields = ['billing', 'butler', 'subscription']
+    autocomplete_fields = ['billing']
     list_editable = ['status']
     list_per_page = 50
     
@@ -40,7 +40,7 @@ class PaymentAdmin(admin.ModelAdmin):
             )
         }),
         ('Payment Method', {
-            'fields': ('method', 'billing', 'butler', 'subscription')
+            'fields': ('method', 'billing')
         }),
         ('Card Information', {
             'fields': (
@@ -73,7 +73,7 @@ class PaymentAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
-            'user', 'billing', 'butler', 'subscription'
+            'user', 'billing'
         )
     
     def card_company(self, obj):
