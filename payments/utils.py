@@ -5,9 +5,12 @@ import uuid
 import requests
 from datetime import datetime
 
+from django.utils import timezone as django_timezone
+
 from server.settings.base import TOSS_API_SECRET_BASE64, PORTONE_API_SECRET
 from .models import Billing, Payment
 
+# Billing
 def create_toss_billing(user, auth_key, customer_key):
     url = "https://api.tosspayments.com/v1/billing/authorizations/issue"
     
@@ -85,21 +88,22 @@ def payment_toss_billing(user, billing, amount, order_id, order_name, tax_free_a
             error_message = response_data.get('error', {}).get('message', 'Unknown error')
             raise ValueError(f"Toss Payments API error: {error_code} - {error_message}")
 
-        # Parse datetime strings
-        requested_at = datetime.fromisoformat(response_data.get('requestedAt', '').replace('+09:00', ''))
+        requested_at_str = response_data.get('requestedAt', '').replace('+09:00', '')
+        requested_at = django_timezone.make_aware(datetime.fromisoformat(requested_at_str))
         approved_at = None
         if response_data.get('approvedAt'):
-            approved_at = datetime.fromisoformat(response_data.get('approvedAt', '').replace('+09:00', ''))
+            approved_at_str = response_data.get('approvedAt', '').replace('+09:00', '')
+            approved_at = django_timezone.make_aware(datetime.fromisoformat(approved_at_str))
         
         # Extract card information
-        card_info = response_data.get('card', {})
+        card_info = response_data.get('card') or {}
         
         # Extract EasyPay information
-        easypay_info = response_data.get('easyPay', {})
+        easypay_info = response_data.get('easyPay') or {}
         
         # Extract receipt and checkout URLs
-        receipt_info = response_data.get('receipt', {})
-        checkout_info = response_data.get('checkout', {})
+        receipt_info = response_data.get('receipt') or {}
+        checkout_info = response_data.get('checkout') or {}
         
         # Create Payment object
         payment = Payment.objects.create(
@@ -385,3 +389,109 @@ def inactivate_billing(billing):
         return delete_portone_billing(billing.billing_key)
     else:
         raise ValueError(f"Unsupported billing vendor: {billing.vender}")
+
+
+# Payment
+def confirm_toss_payment(user, payment_key, amount, order_id):    
+    url = "https://api.tosspayments.com/v1/payments/confirm"
+    
+    headers = {
+        'Authorization': f'Basic {TOSS_API_SECRET_BASE64}',
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "paymentKey": payment_key,
+        "orderId" : order_id,
+        "amount" : amount
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        response_data = response.json()
+
+        if 'error' in response_data:
+            error_code = response_data.get('error', {}).get('code', 'UNKNOWN')
+            error_message = response_data.get('error', {}).get('message', 'Unknown error')
+            raise ValueError(f"Toss Payments API error: {error_code} - {error_message}")
+
+        requested_at_str = response_data.get('requestedAt', '').replace('+09:00', '')
+        requested_at = django_timezone.make_aware(datetime.fromisoformat(requested_at_str))
+        approved_at = None
+        if response_data.get('approvedAt'):
+            approved_at_str = response_data.get('approvedAt', '').replace('+09:00', '')
+            approved_at = django_timezone.make_aware(datetime.fromisoformat(approved_at_str))
+        
+        # Extract card information
+        card_info = response_data.get('card') or {}
+        
+        # Extract EasyPay information
+        easypay_info = response_data.get('easyPay') or {}
+        
+        # Extract receipt and checkout URLs
+        receipt_info = response_data.get('receipt') or {}
+        checkout_info = response_data.get('checkout') or {}
+        
+        payment = Payment.objects.create(
+            user=user,
+            vender='TOSS',
+            payment_key=response_data.get('paymentKey'),
+            status=response_data.get('status'),
+            type=response_data.get('type'),
+            order_id=response_data.get('orderId'),
+            order_name=response_data.get('orderName'),
+            merchant_id=response_data.get('mId'),
+            currency=response_data.get('currency'),
+            method=response_data.get('method'),
+            total_amount=response_data.get('totalAmount'),
+            balance_amount=response_data.get('balanceAmount'),
+            supplied_amount=response_data.get('suppliedAmount'),
+            vat=response_data.get('vat'),
+            tax_exemption_amount=response_data.get('taxExemptionAmount'),
+            tax_free_amount=response_data.get('taxFreeAmount'),
+            
+            # Card information
+            card_issuer_code=card_info.get('issuerCode'),
+            card_acquirer_code=card_info.get('acquirerCode'),
+            card_number=card_info.get('number'),
+            card_installment_plan_months=card_info.get('installmentPlanMonths'),
+            card_is_interest_free=card_info.get('isInterestFree'),
+            card_interest_payer=card_info.get('interestPayer'),
+            card_approve_no=card_info.get('approveNo'),
+            card_use_card_point=card_info.get('useCardPoint'),
+            card_type=card_info.get('cardType'),
+            card_owner_type=card_info.get('ownerType'),
+            card_acquire_status=card_info.get('acquireStatus'),
+            card_amount=card_info.get('amount'),
+            
+            # EasyPay information
+            easypay_provider=easypay_info.get('provider'),
+            easypay_amount=easypay_info.get('amount'),
+            easypay_discount_amount=easypay_info.get('discountAmount'),
+            
+            # Other information
+            country=response_data.get('country'),
+            is_partial_cancelable=response_data.get('isPartialCancelable'),
+            use_escrow=response_data.get('useEscrow'),
+            culture_expense=response_data.get('cultureExpense'),
+            receipt_url=receipt_info.get('url'),
+            checkout_url=checkout_info.get('url'),
+            last_transaction_key=response_data.get('lastTransactionKey'),
+            secret=response_data.get('secret'),
+            version=response_data.get('version'),
+            
+            requested_at=requested_at,
+            approved_at=approved_at,
+        )
+        
+        return payment
+        
+    except requests.exceptions.RequestException as e:
+        raise requests.RequestException(f"Failed to process payment: {str(e)}")
+        
+    except ValueError as e:
+        raise e
+        
+    except Exception as e:
+        raise Exception(f"Unexpected error processing payment: {str(e)}")
