@@ -1,4 +1,4 @@
-# accounts/task.py
+# accounts/tasks.py
 app_name = "accounts"
 
 from celery import shared_task
