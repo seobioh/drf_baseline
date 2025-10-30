@@ -356,18 +356,66 @@ def delete_portone_billing(billing_key):
         raise Exception(f"Unexpected error deleting billing key: {str(e)}")
 
 
-def payment_billing(user, billing, amount, order_name, tax_free_amount=0, tax_exemption_amount=0, currency="KRW"):
+def payment_dummy_billing(user, billing, order_id, order_name, amount, currency="KRW"):
+    now = django_timezone.now()
+    payment_key = f"dummy_{uuid.uuid4()}"
+
+    vat = int(amount * 0.1)
+    supplied_amount = max(0, amount - vat)
+
+    payment = Payment.objects.create(
+        user=user,
+        vender='TOSS',
+        payment_key=payment_key,
+        status='DONE',
+        type='BILLING',
+        order_id=order_id,
+        order_name=order_name,
+        merchant_id='DUMMY_MID',
+        currency=currency,
+        method='FREE',
+        total_amount=amount,
+        balance_amount=0,
+        supplied_amount=supplied_amount,
+        vat=vat,
+        tax_exemption_amount=0,
+        tax_free_amount=0,
+        country='KR',
+        is_partial_cancelable=True,
+        use_escrow=False,
+        culture_expense=False,
+        receipt_url=None,
+        checkout_url=None,
+        last_transaction_key=None,
+        secret=None,
+        version='2022-11-16',
+        requested_at=now,
+        approved_at=now,
+        cancelled_at=None,
+    )
+
+    return payment
+
+
+def payment_billing(user, billing, amount, order_name, currency="KRW"):
     order_id = str(uuid.uuid4())
     
-    if billing.vender == 'TOSS':
+    if amount == 0:
+        return payment_dummy_billing(
+            user=user,
+            billing=billing,
+            order_id=order_id,
+            order_name=order_name,
+            amount=amount,
+            currency=currency
+        )
+    elif billing.vender == 'TOSS':
         return payment_toss_billing(
             user=user,
             billing=billing,
             amount=amount,
             order_id=order_id,
             order_name=order_name,
-            tax_free_amount=tax_free_amount,
-            tax_exemption_amount=tax_exemption_amount
         )
     elif billing.vender == 'PORTONE':
         return payment_portone_billing(
