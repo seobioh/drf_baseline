@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',     # JWT
     'corsheaders',                  # CORS
+    'django_crontab',               # Crontab
     'drf_spectacular',              # Swagger
 
     # My apps
@@ -166,6 +167,11 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 # Celery
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+
+
+# Crontab
+CRONJOBS = [
+]
 
 
 # Social
