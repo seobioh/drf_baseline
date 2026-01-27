@@ -9,7 +9,6 @@ from .views import AdAPIView, AdDetailAPIView
 from .views import FAQAPIView, FAQDetailAPIView
 from .views import PrivacyPolicyAPIView, PrivacyPolicyDetailAPIView
 from .views import TermAPIView, TermDetailAPIView
-from .views import GPTAPIView
 
 urlpatterns = [
     path('/notices', NoticeAPIView.as_view(), name='notice'),
@@ -29,6 +28,4 @@ urlpatterns = [
     
     path('/terms', TermAPIView.as_view(), name='term'),
     path('/terms/<int:term_id>', TermDetailAPIView.as_view(), name='term-detail'),
-
-    path('/gpt/<int:gpt_prompt_id>', GPTAPIView.as_view(), name='gpt'),
 ]

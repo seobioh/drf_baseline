@@ -11,8 +11,7 @@ from drf_spectacular.utils import extend_schema
 
 from server.utils import SuccessResponseBuilder
 
-from .utils import GPTService
-from .models import Notice, Event, Ad, FAQ, PrivacyPolicy, Term, GPTPrompt
+from .models import Notice, Event, Ad, FAQ, PrivacyPolicy, Term
 from .serializers import NoticeSerializer, EventSerializer, AdSerializer
 from .serializers import FAQSerializer, PrivacyPolicySerializer, TermSerializer
 from .schemas import ServicesSchema
@@ -22,9 +21,9 @@ class NoticeAPIView(APIView):
     def get(self, request):
         service = request.query_params.get('service')
         if service:
-            notices = Notice.objects.filter(is_active=True, service=service).order_by('-created_at')
+            notices = Notice.objects.filter(is_active=True, service=service).order_by('service', 'order')
         else:
-            notices = Notice.objects.filter(is_active=True).order_by('-created_at')
+            notices = Notice.objects.filter(is_active=True).order_by('order')
         
         serializer = NoticeSerializer(notices, many=True)
         response = SuccessResponseBuilder().with_message("공지사항 조회 성공").with_data({"notices": serializer.data}).build()
@@ -45,9 +44,9 @@ class EventAPIView(APIView):
     def get(self, request):
         service = request.query_params.get('service')
         if service:
-            events = Event.objects.filter(is_active=True, service=service).order_by('-created_at')
+            events = Event.objects.filter(is_active=True, service=service).order_by('service', 'order')
         else:
-            events = Event.objects.filter(is_active=True).order_by('-created_at')
+            events = Event.objects.filter(is_active=True).order_by('order')
         
         serializer = EventSerializer(events, many=True)
         response = SuccessResponseBuilder().with_message("이벤트 조회 성공").with_data({"events": serializer.data}).build()
@@ -68,9 +67,9 @@ class AdAPIView(APIView):
     def get(self, request):
         service = request.query_params.get('service')
         if service:
-            ads = Ad.objects.filter(is_active=True, service=service).order_by('-created_at')
+            ads = Ad.objects.filter(is_active=True, service=service).order_by('service', 'order')
         else:
-            ads = Ad.objects.filter(is_active=True).order_by('-created_at')
+            ads = Ad.objects.filter(is_active=True).order_by('order')
         
         serializer = AdSerializer(ads, many=True)
         response = SuccessResponseBuilder().with_message("광고 조회 성공").with_data({"ads": serializer.data}).build()
@@ -93,7 +92,7 @@ class FAQAPIView(APIView):
         if service:
             faqs = FAQ.objects.filter(is_active=True, service=service).order_by('service', 'order')
         else:
-            faqs = FAQ.objects.filter(is_active=True).order_by('service', 'order')
+            faqs = FAQ.objects.filter(is_active=True).order_by('order')
         
         serializer = FAQSerializer(faqs, many=True)
         response = SuccessResponseBuilder().with_message("FAQ 조회 성공").with_data({"faqs": serializer.data}).build()
@@ -116,7 +115,7 @@ class PrivacyPolicyAPIView(APIView):
         if service:
             privacys = PrivacyPolicy.objects.filter(is_active=True, service=service).order_by('service', 'order')
         else:
-            privacys = PrivacyPolicy.objects.filter(is_active=True).order_by('service', 'order')
+            privacys = PrivacyPolicy.objects.filter(is_active=True).order_by('order')
         
         serializer = PrivacyPolicySerializer(privacys, many=True)
         response = SuccessResponseBuilder().with_message("개인정보처리방침 조회 성공").with_data({"privacy_policies": serializer.data}).build()
@@ -139,7 +138,7 @@ class TermAPIView(APIView):
         if service:
             terms = Term.objects.filter(is_active=True, service=service).order_by('service', 'order')
         else:
-            terms = Term.objects.filter(is_active=True).order_by('service', 'order')
+            terms = Term.objects.filter(is_active=True).order_by('order')
         
         serializer = TermSerializer(terms, many=True)
         response = SuccessResponseBuilder().with_message("이용약관 조회 성공").with_data({"terms": serializer.data}).build()
@@ -153,17 +152,3 @@ class TermDetailAPIView(APIView):
         serializer = TermSerializer(term)
         response = SuccessResponseBuilder().with_message("이용약관 조회 성공").with_data({"term": serializer.data}).build()
         return Response(response, status=status.HTTP_200_OK)
-
-
-class GPTAPIView(APIView):
-    @extend_schema(**ServicesSchema.get_gpt_prompts())
-    def post(self, request, gpt_prompt_id):
-        gpt_prompt = get_object_or_404(GPTPrompt, id=gpt_prompt_id, is_active=True)
-        gpt_service = GPTService()
-        generator = gpt_service.generate_stream_response(gpt_prompt.prompt, request.data.get('message'))
-        
-        from django.http import StreamingHttpResponse
-        response = StreamingHttpResponse(generator, content_type='text/event-stream')
-        response['Cache-Control'] = 'no-cache'
-        response['X-Accel-Buffering'] = 'no'
-        return response

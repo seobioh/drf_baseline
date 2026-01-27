@@ -15,6 +15,7 @@ class Notice(models.Model):
     service = models.CharField(max_length=20, choices=Service.SERVICE_CHOICES)
     title = models.CharField(max_length=100)
     subtitle = models.CharField(max_length=200, blank=True, null=True)
+    order = models.PositiveIntegerField(default=1)
 
     mobile_img = models.URLField(max_length=500, blank=True, null=True)
     desktop_img = models.URLField(max_length=500, blank=True, null=True)
@@ -42,6 +43,7 @@ class Event(models.Model):
     service = models.CharField(max_length=20, choices=Service.SERVICE_CHOICES)
     title = models.CharField(max_length=100)
     subtitle = models.CharField(max_length=200, blank=True, null=True)
+    order = models.PositiveIntegerField(default=1)
 
     mobile_img = models.URLField(max_length=500, blank=True, null=True)
     desktop_img = models.URLField(max_length=500, blank=True, null=True)
@@ -69,6 +71,8 @@ class Ad(models.Model):
     service = models.CharField(max_length=20, choices=Service.SERVICE_CHOICES)
     title = models.CharField(max_length=100)
     subtitle = models.CharField(max_length=200, blank=True, null=True)
+    order = models.PositiveIntegerField(default=1)
+
 
     mobile_img = models.URLField(max_length=500, blank=True, null=True)
     desktop_img = models.URLField(max_length=500, blank=True, null=True)
@@ -152,20 +156,3 @@ class Term(models.Model):
     def __str__(self):
         return f'({self.service} - {self.subject})'
 
-
-class GPTPrompt(models.Model):
-    service = models.CharField(max_length=20, choices=Service.SERVICE_CHOICES)
-
-    prompt = models.TextField()
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    modified_at = models.DateTimeField(auto_now=True)
-
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        verbose_name = 'GPT Prompt'
-        verbose_name_plural = 'GPT Prompts'
-
-    def __str__(self):
-        return f'({self.service} - {self.prompt})'

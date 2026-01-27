@@ -3,11 +3,11 @@ app_name = "services"
 
 from django.contrib import admin
 
-from .models import Notice, Event, Ad, FAQ, PrivacyPolicy, Term, GPTPrompt
+from .models import Notice, Event, Ad, FAQ, PrivacyPolicy, Term
 
 @admin.register(Notice)
 class NoticeAdmin(admin.ModelAdmin):
-    list_display = ('service', 'title', 'subtitle', 'start_date', 'end_date', 'is_active', 'created_at')
+    list_display = ('service', 'title', 'subtitle', 'order', 'start_date', 'end_date', 'is_active', 'created_at')
     list_filter = ('service', 'is_active', 'created_at', 'start_date', 'end_date')
     search_fields = ('title', 'subtitle', 'description')
     list_editable = ('is_active',)
@@ -16,7 +16,7 @@ class NoticeAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('service', 'title', 'subtitle', 'description')
+            'fields': ('service', 'title', 'subtitle', 'order', 'description')
         }),
         ('Images', {
             'fields': ('mobile_img', 'desktop_img', 'detail_img'),
@@ -37,7 +37,7 @@ class NoticeAdmin(admin.ModelAdmin):
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('service', 'title', 'subtitle', 'start_date', 'end_date', 'is_active', 'created_at')
+    list_display = ('service', 'title', 'subtitle', 'order', 'start_date', 'end_date', 'is_active', 'created_at')
     list_filter = ('service', 'is_active', 'created_at', 'start_date', 'end_date')
     search_fields = ('title', 'subtitle', 'description')
     list_editable = ('is_active',)
@@ -46,7 +46,7 @@ class EventAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('service', 'title', 'subtitle', 'description')
+            'fields': ('service', 'title', 'subtitle', 'order', 'description')
         }),
         ('Images', {
             'fields': ('mobile_img', 'desktop_img', 'detail_img'),
@@ -67,7 +67,7 @@ class EventAdmin(admin.ModelAdmin):
 
 @admin.register(Ad)
 class AdAdmin(admin.ModelAdmin):
-    list_display = ('service', 'title', 'subtitle', 'start_date', 'end_date', 'is_active', 'created_at')
+    list_display = ('service', 'title', 'subtitle', 'order', 'start_date', 'end_date', 'is_active', 'created_at')
     list_filter = ('service', 'is_active', 'created_at', 'start_date', 'end_date')
     search_fields = ('title', 'subtitle', 'description')
     list_editable = ('is_active',)
@@ -76,7 +76,7 @@ class AdAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('service', 'title', 'subtitle', 'description')
+            'fields': ('service', 'title', 'subtitle', 'order', 'description')
         }),
         ('Images', {
             'fields': ('mobile_img', 'desktop_img', 'detail_img', 'background_img'),
@@ -142,22 +142,6 @@ class TermAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Basic Information', {
             'fields': ('service', 'order', 'subject', 'detail')
-        }),
-        ('Status', {
-            'fields': ('is_active',)
-        })
-    )
-
-
-@admin.register(GPTPrompt)
-class GPTPromptAdmin(admin.ModelAdmin):
-    list_display = ('service', 'prompt', 'is_active', 'created_at')
-    list_filter = ('service', 'is_active', 'created_at')
-    list_editable = ('is_active',)
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('service', 'prompt')
         }),
         ('Status', {
             'fields': ('is_active',)

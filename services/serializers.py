@@ -9,7 +9,7 @@ class NoticeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notice
         fields = [
-            'id', 'service', 'title', 'subtitle', 'mobile_img', 'desktop_img', 
+            'id', 'service', 'title', 'subtitle', 'order', 'mobile_img', 'desktop_img', 
             'detail_img', 'description', 'link', 'start_date', 'end_date', 
             'is_active', 'created_at', 'modified_at'
         ]
@@ -20,7 +20,7 @@ class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = [
-            'id', 'service', 'title', 'subtitle', 'mobile_img', 'desktop_img', 
+            'id', 'service', 'title', 'subtitle', 'order', 'mobile_img', 'desktop_img', 
             'detail_img', 'description', 'link', 'start_date', 'end_date', 
             'is_active', 'created_at', 'modified_at'
         ]
@@ -31,7 +31,7 @@ class AdSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ad
         fields = [
-            'id', 'service', 'title', 'subtitle', 'mobile_img', 'desktop_img', 
+            'id', 'service', 'title', 'subtitle', 'order', 'mobile_img', 'desktop_img', 
             'detail_img', 'background_img', 'description', 'link', 'start_date', 'end_date', 
             'is_active', 'created_at', 'modified_at'
         ]
