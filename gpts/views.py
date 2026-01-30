@@ -97,12 +97,9 @@ class GPTChatMessageAPIView(APIView):
         page = paginator.paginate_queryset(messages, request, view=self)
         if page is not None:
             pagination = {
-                'count': paginator.page.paginator.count,
                 'next': paginator.get_next_link(),
                 'previous': paginator.get_previous_link(),
                 'page_size': paginator.page_size,
-                'current_page': paginator.page.number,
-                'total_pages': paginator.page.paginator.num_pages
             }
             serializer = GPTChatMessageSerializer(page, many=True)
             response = SuccessResponseBuilder().with_message("GPT 채팅메시지 조회 성공").with_data({"gpt_chat_messages": serializer.data, "pagination": pagination}).build()
