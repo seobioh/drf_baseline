@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'users',
     'payments',
     'gpts',
+    'communities',
 ]
 
 
