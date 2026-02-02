@@ -13,7 +13,7 @@ from drf_spectacular.utils import extend_schema
 
 from server.utils import SuccessResponseBuilder, ErrorResponseBuilder
 
-from .utils import get_object_with_permission
+from .utils import get_object_with_permission, get_member_from_obj
 from .models import Community, CommunityFavorite, Member, Follow, FollowStatus
 from .paginations import FollowerCursorPagination, FollowingCursorPagination
 from .schemas import CommunitySchema, MemberSchema, FollowerSchema, FollowingSchema, BlockSchema
@@ -55,7 +55,7 @@ class FavoriteCommunityAPIView(APIView):
     @extend_schema(**CommunitySchema.get_favorite_status())
     def get(self, request, community_id):
         community = get_object_with_permission(self, Community, community_id, request)
-        favored = CommunityFavorite.objects.filter(member=community._member).exists()
+        favored = CommunityFavorite.objects.filter(member=get_member_from_obj(community)).exists()
         response = SuccessResponseBuilder().with_message("커뮤니티 즐겨찾기 여부 조회 성공").with_data({"favored": favored}).build()
         return Response(response, status=status.HTTP_200_OK)
 
@@ -63,7 +63,7 @@ class FavoriteCommunityAPIView(APIView):
     @extend_schema(**CommunitySchema.create_favorite())
     def post(self, request, community_id):
         community = get_object_with_permission(self, Community, community_id, request)
-        obj, created = CommunityFavorite.objects.get_or_create(member=community._member, community=community)
+        obj, created = CommunityFavorite.objects.get_or_create(member=get_member_from_obj(community), community=community)
         if created:
             Community.objects.filter(id=community_id).update(favorite_count=F('favorite_count') + 1)
         response = SuccessResponseBuilder().with_message("커뮤니티 즐겨찾기 성공").with_data({"favored": True}).build()
@@ -73,7 +73,7 @@ class FavoriteCommunityAPIView(APIView):
     @extend_schema(**CommunitySchema.delete_favorite())
     def delete(self, request, community_id):
         community = get_object_with_permission(self, Community, community_id, request)
-        deleted, _ = CommunityFavorite.objects.filter(member=community._member, community=community).delete()
+        deleted, _ = CommunityFavorite.objects.filter(member=get_member_from_obj(community), community=community).delete()
         if deleted:
             Community.objects.filter(id=community_id).update(favorite_count=F('favorite_count') - 1)
         response = SuccessResponseBuilder().with_message("커뮤니티 즐겨찾기 취소 성공").with_data({"favored": False}).build()
@@ -104,7 +104,7 @@ class MemberAPIView(APIView):
     @extend_schema(**MemberSchema.get_members())
     def get(self, request, community_id):
         community = get_object_with_permission(self, Community, community_id, request)
-        member = Member.objects.get(user=request.user, community=community)
+        member = get_member_from_obj(community)
         blocked_ids = Follow.objects.filter(Q(follower=member, status=FollowStatus.BLOCKED) | Q(following=member, status=FollowStatus.BLOCKED)).values_list('follower_id', 'following_id')
         blocked_member_ids = {i for pair in blocked_ids for i in pair if i != member.id}
         members = Member.objects.filter(community=community).exclude(id__in=blocked_member_ids)

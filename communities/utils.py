@@ -30,3 +30,7 @@ def get_object_with_permission(view, model, pk_value, request, pk_field='id'):
     obj._member = member
     view.check_object_permissions(request, obj)
     return obj
+
+
+def get_member_from_obj(obj):
+    return getattr(obj, '_member', None)
