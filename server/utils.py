@@ -5,6 +5,7 @@ class SuccessResponseBuilder:
         self.message = "Success"
         self.code = 0
         self.data = {}
+        self.pagination = None
 
     def with_message(self, message: str):
         self.message = message
@@ -18,12 +19,23 @@ class SuccessResponseBuilder:
         self.data = data
         return self
 
+    def with_cursor_pagination(self, paginator):
+        self.pagination = get_cursor_pagination_data(paginator)
+        return self
+
+    def with_page_pagination(self, paginator, page):
+        self.pagination = get_page_pagination_data(paginator, page)
+        return self
+
     def build(self):
-        return {
+        response = {
             "code": self.code,
             "message": self.message,
             "data": self.data,
         }
+        if self.pagination is not None:
+            response["pagination"] = self.pagination
+        return response
 
 
 # Error Response Builder
@@ -51,3 +63,22 @@ class ErrorResponseBuilder:
             "message": self.message,
             "errors": self.errors,
         }
+
+
+def get_cursor_pagination_data(paginator):
+    return {
+        'next': paginator.get_next_link(),
+        'previous': paginator.get_previous_link(),
+        'page_size': paginator.page_size,
+    }
+
+
+def get_page_pagination_data(paginator, page):
+    return {
+        'count': paginator.page.paginator.count,
+        'next': paginator.get_next_link(),
+        'previous': paginator.get_previous_link(),
+        'page_size': paginator.page_size,
+        'current_page': paginator.page.number,
+        'total_pages': paginator.page.paginator.num_pages
+    }
