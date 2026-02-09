@@ -1,9 +1,52 @@
 # gpts/schemas.py
 app_name = "gpts"
 
+from rest_framework import serializers
+
 from drf_spectacular.utils import OpenApiExample
 
 from server.schemas import SuccessResponseSerializer, ErrorResponseSerializer
+
+
+# Wrapper Serializers
+# <-------------------------------------------------------------------------------------------------------------------------------->
+# Request Serializers
+class GPTChatRoomRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(required=False, allow_blank=True, max_length=100, help_text="채팅방 이름 (선택)")
+    prompt = serializers.IntegerField(required=False, allow_null=True, help_text="GPT 프롬프트 ID (선택)")
+
+
+class GPTChatMessageRequestSerializer(serializers.Serializer):
+    message = serializers.CharField(help_text="전송할 메시지 내용")
+    model = serializers.ChoiceField(
+        choices=['gpt-4o-mini', 'gpt-4o', 'gpt-4o-turbo'],
+        required=False,
+        default='gpt-4o-mini',
+        help_text="사용할 GPT 모델 (선택, 기본값: gpt-4o-mini)"
+    )
+
+
+class GPTStartRequestSerializer(serializers.Serializer):
+    prompt = serializers.IntegerField(required=False, allow_null=True, help_text="GPT 프롬프트 ID (선택, 없으면 기본 대화)")
+    message = serializers.CharField(help_text="첫 메시지 내용")
+    model = serializers.ChoiceField(
+        choices=['gpt-4o-mini', 'gpt-4o', 'gpt-4o-turbo'],
+        required=False,
+        default='gpt-4o-mini',
+        help_text="사용할 GPT 모델 (선택, 기본값: gpt-4o-mini)"
+    )
+
+
+class GPTSessionRequestSerializer(serializers.Serializer):
+    prompt = serializers.IntegerField(required=False, allow_null=True, help_text="GPT 프롬프트 ID (선택, 없으면 기본 대화)")
+    message = serializers.CharField(help_text="메시지 내용")
+    model = serializers.ChoiceField(
+        choices=['gpt-4o-mini', 'gpt-4o', 'gpt-4o-turbo'],
+        required=False,
+        default='gpt-4o-mini',
+        help_text="사용할 GPT 모델 (선택, 기본값: gpt-4o-mini)"
+    )
+
 
 # Common Examples
 # <-------------------------------------------------------------------------------------------------------------------------------->
@@ -114,23 +157,7 @@ class GPTSchema:
             'summary': "GPT 채팅방 생성",
             'description': "새 GPT 채팅방을 생성합니다.",
             'operation_id': 'gpts_chat_room_create_post',
-            'request': {
-                'type': 'object',
-                'properties': {
-                    'name': {
-                        'type': 'string',
-                        'maxLength': 100,
-                        'description': '채팅방 이름',
-                        'example': '새 채팅방',
-                    },
-                    'prompt': {
-                        'type': 'integer',
-                        'nullable': True,
-                        'description': 'GPT 프롬프트 ID (선택)',
-                    },
-                },
-                'required': [],
-            },
+            'request': GPTChatRoomRequestSerializer,
             'responses': {
                 200: SuccessResponseSerializer,
                 400: ErrorResponseSerializer,
@@ -206,22 +233,7 @@ class GPTSchema:
             'summary': "GPT 채팅방 수정",
             'description': "GPT 채팅방 정보를 수정합니다.",
             'operation_id': 'gpts_chat_room_update_put',
-            'request': {
-                'type': 'object',
-                'properties': {
-                    'name': {
-                        'type': 'string',
-                        'maxLength': 100,
-                        'description': '채팅방 이름',
-                    },
-                    'prompt': {
-                        'type': 'integer',
-                        'nullable': True,
-                        'description': 'GPT 프롬프트 ID (선택)',
-                    },
-                },
-                'required': [],
-            },
+            'request': GPTChatRoomRequestSerializer,
             'responses': {
                 200: SuccessResponseSerializer,
                 400: ErrorResponseSerializer,
@@ -323,23 +335,7 @@ class GPTSchema:
             'summary': "GPT 채팅 메시지 전송",
             'description': "채팅방에 사용자 메시지를 전송하고, GPT 스트리밍 응답을 받습니다.",
             'operation_id': 'gpts_chat_message_create_post',
-            'request': {
-                'type': 'object',
-                'properties': {
-                    'message': {
-                        'type': 'string',
-                        'description': '전송할 메시지 내용',
-                        'example': '안녕하세요',
-                    },
-                    'model': {
-                        'type': 'string',
-                        'enum': ['gpt-4o-mini', 'gpt-4o', 'gpt-4o-turbo'],
-                        'description': '사용할 GPT 모델',
-                        'default': 'gpt-4o-mini',
-                    },
-                },
-                'required': ['message'],
-            },
+            'request': GPTChatMessageRequestSerializer,
             'responses': {
                 200: {
                     'description': 'text/event-stream 스트리밍 응답',
@@ -376,28 +372,7 @@ class GPTSchema:
             'summary': "GPT 채팅 시작 (방 생성 + 첫 메시지 스트리밍)",
             'description': "프롬프트와 첫 메시지로 채팅방을 생성하고, GPT 스트리밍 응답을 바로 받습니다.",
             'operation_id': 'gpts_start_post',
-            'request': {
-                'type': 'object',
-                'properties': {
-                    'prompt': {
-                        'type': 'integer',
-                        'nullable': True,
-                        'description': 'GPT 프롬프트 ID (선택, 없으면 기본 대화)',
-                    },
-                    'message': {
-                        'type': 'string',
-                        'description': '첫 메시지 내용',
-                        'example': '안녕하세요',
-                    },
-                    'model': {
-                        'type': 'string',
-                        'enum': ['gpt-4o-mini', 'gpt-4o', 'gpt-4o-turbo'],
-                        'description': '사용할 GPT 모델',
-                        'default': 'gpt-4o-mini',
-                    },
-                },
-                'required': ['message'],
-            },
+            'request': GPTStartRequestSerializer,
             'responses': {
                 200: {
                     'description': 'text/event-stream 스트리밍 응답',
@@ -434,28 +409,7 @@ class GPTSchema:
             'summary': "GPT 세션 스트리밍",
             'description': "프롬프트와 메시지로 GPT 응답을 스트리밍으로 받습니다. 채팅방/DB 저장 없이 세션만 수행합니다.",
             'operation_id': 'gpts_session_post',
-            'request': {
-                'type': 'object',
-                'properties': {
-                    'prompt': {
-                        'type': 'integer',
-                        'nullable': True,
-                        'description': 'GPT 프롬프트 ID (선택, 없으면 기본 대화)',
-                    },
-                    'message': {
-                        'type': 'string',
-                        'description': '메시지 내용',
-                        'example': '안녕하세요',
-                    },
-                    'model': {
-                        'type': 'string',
-                        'enum': ['gpt-4o-mini', 'gpt-4o', 'gpt-4o-turbo'],
-                        'description': '사용할 GPT 모델',
-                        'default': 'gpt-4o-mini',
-                    },
-                },
-                'required': ['message'],
-            },
+            'request': GPTSessionRequestSerializer,
             'responses': {
                 200: {
                     'description': 'text/event-stream 스트리밍 응답',
