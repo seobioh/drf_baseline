@@ -6,19 +6,24 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from django.db import transaction
-from django.db.models import Q, F
+from django.db.models import Q, F, Exists, OuterRef
 from django.shortcuts import get_object_or_404
 
 from drf_spectacular.utils import extend_schema
 
 from server.utils import SuccessResponseBuilder, ErrorResponseBuilder
 
-from .utils import get_object_with_permission, get_member_from_obj
+from .utils import get_object_with_permission, get_member_from_obj, get_blocked_member_ids, increase_count, decrease_count
 from .models import Community, CommunityFavorite, Member, Follow, FollowStatus
+from .models import PostCategory, PostCategoryFavorite, Post, PostLike, PostScrap, PostComment, PostCommentLike, PostReply, PostReplyLike
 from .paginations import FollowerCursorPagination, FollowingCursorPagination
+from .paginations import PostPagination, PostCommentPagination, PostReplyPagination
 from .schemas import CommunitySchema, MemberSchema, FollowerSchema, FollowingSchema, BlockSchema
+from .schemas import PostCategorySchema, PostSchema, PostCommentSchema, PostReplySchema
 from .serializers import CommunitySerializer, MemberSerializer, MemberListSerializer, MemberSimpleSerializer, FollowSerializer
+from .serializers import PostCategorySerializer, PostSerializer, PostListSerializer, PostDetailSerializer, PostCommentSerializer, PostReplySerializer
 from .permissions import AllowAny, IsAuthenticated, IsSelf, IsProfileReadable
+from .permissions import IsMember, IsMemberAuthor
 
 # Community APIView
 # <-------------------------------------------------------------------------------------------------------------------------------->
@@ -55,7 +60,8 @@ class FavoriteCommunityAPIView(APIView):
     @extend_schema(**CommunitySchema.get_favorite_status())
     def get(self, request, community_id):
         community = get_object_with_permission(self, Community, community_id, request)
-        favored = CommunityFavorite.objects.filter(member=get_member_from_obj(community)).exists()
+        member = get_member_from_obj(community)
+        favored = CommunityFavorite.objects.filter(member=member).exists()
         response = SuccessResponseBuilder().with_message("커뮤니티 즐겨찾기 여부 조회 성공").with_data({"favored": favored}).build()
         return Response(response, status=status.HTTP_200_OK)
 
@@ -63,9 +69,9 @@ class FavoriteCommunityAPIView(APIView):
     @extend_schema(**CommunitySchema.create_favorite())
     def post(self, request, community_id):
         community = get_object_with_permission(self, Community, community_id, request)
-        obj, created = CommunityFavorite.objects.get_or_create(member=get_member_from_obj(community), community=community)
+        community_favorite, created = CommunityFavorite.objects.get_or_create(member=get_member_from_obj(community), community=community)
         if created:
-            Community.objects.filter(id=community_id).update(favorite_count=F('favorite_count') + 1)
+            increase_count(community_favorite)
         response = SuccessResponseBuilder().with_message("커뮤니티 즐겨찾기 성공").with_data({"favored": True}).build()
         return Response(response, status=status.HTTP_200_OK)
 
@@ -73,9 +79,10 @@ class FavoriteCommunityAPIView(APIView):
     @extend_schema(**CommunitySchema.delete_favorite())
     def delete(self, request, community_id):
         community = get_object_with_permission(self, Community, community_id, request)
-        deleted, _ = CommunityFavorite.objects.filter(member=get_member_from_obj(community), community=community).delete()
-        if deleted:
-            Community.objects.filter(id=community_id).update(favorite_count=F('favorite_count') - 1)
+        community_favorite = CommunityFavorite.objects.filter(member=get_member_from_obj(community), community=community).first()
+        if community_favorite:
+            decrease_count(community_favorite)
+            community_favorite.delete()
         response = SuccessResponseBuilder().with_message("커뮤니티 즐겨찾기 취소 성공").with_data({"favored": False}).build()
         return Response(response, status=status.HTTP_200_OK)
 
@@ -122,7 +129,8 @@ class MemberAPIView(APIView):
 
         serializer = MemberSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(community=community, user=request.user, is_staff=request.user.is_staff, is_admin=request.user.is_admin)
+            member = serializer.save(community=community, user=request.user, is_staff=request.user.is_staff, is_admin=request.user.is_admin)
+            increase_count(member)
             response = SuccessResponseBuilder().with_message("멤버 등록 성공").with_data(serializer.data).build()
             return Response(response, status=status.HTTP_201_CREATED)
 
@@ -177,6 +185,7 @@ class MemberDetailAPIView(APIView):
     def delete(self, request, member_id):
         member = get_object_or_404(Member, id=member_id)
         self.check_object_permissions(request, member)
+        decrease_count(member)
         member.delete()
         response = SuccessResponseBuilder().with_message("멤버 탈퇴 성공").build()
         return Response(response, status=status.HTTP_200_OK)
@@ -204,16 +213,12 @@ class FollowerAPIView(APIView):
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(followers, request, view=self)
         if page is not None:
-            pagination = {
-                'next': paginator.get_next_link(),
-                'previous': paginator.get_previous_link(),
-                'page_size': paginator.page_size,
-            }
             serializer = FollowSerializer(page, many=True)
-            response = SuccessResponseBuilder().with_message("팔로워 목록 조회 성공").with_data({"followers": serializer.data, "pagination": pagination}).build()
+            response = SuccessResponseBuilder().with_message("팔로워 목록 조회 성공").with_data(serializer.data).with_cursor_pagination(paginator).build()
+            return Response(response, status=status.HTTP_200_OK)
 
         serializer = FollowSerializer(followers, many=True)
-        response = SuccessResponseBuilder().with_message("팔로워 목록 조회 성공").with_data({"followers": serializer.data}).build()
+        response = SuccessResponseBuilder().with_message("팔로워 목록 조회 성공").with_data(serializer.data).build()
         return Response(response, status=status.HTTP_200_OK)
 
 
@@ -282,16 +287,12 @@ class FollowingAPIView(APIView):
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(followings, request, view=self)
         if page is not None:
-            pagination = {
-                'next': paginator.get_next_link(),
-                'previous': paginator.get_previous_link(),
-                'page_size': paginator.page_size,
-            }
             serializer = FollowSerializer(page, many=True)
-            response = SuccessResponseBuilder().with_message("팔로잉 목록 조회 성공").with_data({"followings": serializer.data, "pagination": pagination}).build()
+            response = SuccessResponseBuilder().with_message("팔로잉 목록 조회 성공").with_data(serializer.data).with_cursor_pagination(paginator).build()
+            return Response(response, status=status.HTTP_200_OK)
 
         serializer = FollowSerializer(followings, many=True)
-        response = SuccessResponseBuilder().with_message("팔로잉 목록 조회 성공").with_data({"followings": serializer.data}).build()
+        response = SuccessResponseBuilder().with_message("팔로잉 목록 조회 성공").with_data(serializer.data).build()
         return Response(response, status=status.HTTP_200_OK)
 
 
@@ -338,9 +339,9 @@ class FollowingDetailAPIView(APIView):
         serializer = FollowSerializer(data={'follower': member_id, 'following': following_id})
         serializer.is_valid(raise_exception=True)
         follow = serializer.save()
-        response = SuccessResponseBuilder().with_message("팔로우 성공").build()
         Member.objects.filter(id=member.id).update(following_count=F('following_count') + 1)
         Member.objects.filter(id=following.id).update(follower_count=F('follower_count') + 1)
+        response = SuccessResponseBuilder().with_message("팔로우 성공").build()
         return Response(response, status=status.HTTP_201_CREATED)
     
     # 팔로우 취소
@@ -448,3 +449,631 @@ class BlockDetailAPIView(APIView):
             return Response(response, status=status.HTTP_200_OK)
         response = ErrorResponseBuilder().with_message("차단되지 않았습니다.").build()
         return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Post Category
+# <-------------------------------------------------------------------------------------------------------------------------------->
+# Post Category APIView
+class PostCategoryAPIView(APIView):
+    permission_classes = [IsMember]
+    
+    # Post Category 목록 조회: 멤버만 가능
+    @extend_schema(**PostCategorySchema.get_categories())
+    def get(self, request, community_id):
+        community = get_object_with_permission(self, Community, community_id, request)
+        categories = community.post_categories.all().select_related('parent').order_by('id')
+        serializer = PostCategorySerializer(categories, many=True)
+        response = SuccessResponseBuilder().with_message("카테고리 목록 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post Category Detail APIView
+class PostCategoryDetailAPIView(APIView):
+    permission_classes = [IsMember]
+
+    # Post Category 상세 조회: 멤버만 가능
+    @extend_schema(**PostCategorySchema.get_category_detail())
+    def get(self, request, category_id):
+        category = get_object_with_permission(self, PostCategory, category_id, request)
+        serializer = PostCategorySerializer(category)
+        response = SuccessResponseBuilder().with_message("카테고리 상세 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Favorite Post Category APIView
+class FavoritePostCategoryAPIView(APIView):
+    permission_classes = [IsMember]
+    
+    # Post Category 즐겨찾기 여부 조회: 멤버이면서 본인만 가능
+    @extend_schema(**PostCategorySchema.get_favorite_status())
+    def get(self, request, category_id):
+        category = get_object_with_permission(self, PostCategory, category_id, request)
+        favored = PostCategoryFavorite.objects.filter(member=category._member, category=category).exists()
+        response = SuccessResponseBuilder().with_message("카테고리 즐겨찾기 여부 조회 성공").with_data({'favored': favored}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post Category 즐겨찾기: 멤버이면서 본인만 가능
+    @extend_schema(**PostCategorySchema.create_favorite())
+    def post(self, request, category_id):
+        category = get_object_with_permission(self, PostCategory, category_id, request)
+        member = get_member_from_obj(category)
+        post_category_favorite, created = PostCategoryFavorite.objects.get_or_create(member=member, category=category)
+        if created:
+            increase_count(post_category_favorite)
+        response = SuccessResponseBuilder().with_message("카테고리 즐겨찾기 성공").with_data({'favored': True}).build()
+        return Response(response, status=status.HTTP_201_CREATED)
+
+    # Post Category 즐겨찾기 취소: 멤버이면서 본인만 가능
+    @extend_schema(**PostCategorySchema.delete_favorite())
+    def delete(self, request, category_id):
+        category = get_object_with_permission(self, PostCategory, category_id, request)
+        member = get_member_from_obj(category)
+        post_category_favorite = PostCategoryFavorite.objects.filter(member=member, category=category).first()
+        if post_category_favorite:
+            decrease_count(post_category_favorite)
+            post_category_favorite.delete()
+        response = SuccessResponseBuilder().with_message("카테고리 즐겨찾기 취소 성공").with_data({'favored': False}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Favorite Post Category List API View
+class FavoritePostCategoryListAPIView(APIView):
+    permission_classes = [IsMember]
+
+    # 커뮤니티 내 즐겨찾기 한 카테고리 목록
+    @extend_schema(**PostCategorySchema.get_categories())
+    def get(self, request, community_id):
+        community = get_object_with_permission(self, Community, community_id, request)
+        member = get_member_from_obj(community)
+        favorites = PostCategoryFavorite.objects.filter(member=member, category__community=community).select_related('category')
+        categories = [fav.category for fav in favorites]
+        serializer = PostCategorySerializer(categories, many=True)
+        response = SuccessResponseBuilder().with_message("커뮤니티 내 즐겨찾기 한 카테고리 목록 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post
+# <-------------------------------------------------------------------------------------------------------------------------------->
+# Post APIView
+class PostAPIView(APIView):
+    permission_classes = [IsMember]
+    pagination_class = PostPagination
+
+    # Post 목록 조회: 멤버만 가능
+    @extend_schema(**PostSchema.get_posts())
+    def get(self, request, category_id):
+        category = get_object_with_permission(self, PostCategory, category_id, request)
+        member = get_member_from_obj(category)
+        blocked_member_ids = get_blocked_member_ids([member])
+
+        if category.parent is None:
+            subcategory_ids = category.post_subcategories.values_list('id', flat=True)
+            posts = Post.objects.filter(category__in=[category.id, *subcategory_ids])
+        else:
+            posts = category.posts.all()
+            
+        posts = posts.exclude(author_id__in=blocked_member_ids).select_related('author').annotate(
+            is_liked=Exists(PostLike.objects.filter(post=OuterRef('pk'), member=member)),
+            is_scraped=Exists(PostScrap.objects.filter(post=OuterRef('pk'), member=member)),
+            is_following=Exists(Follow.objects.filter(follower=member, following=OuterRef('author'), status=FollowStatus.ACCEPTED)),
+        ).order_by('-id')
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(posts, request)
+        
+        if page is not None:
+            serializer = PostListSerializer(page, many=True)
+            response = SuccessResponseBuilder().with_message("카테고리 내 글 목록 조회 성공").with_data(serializer.data).with_page_pagination(paginator, page).build()
+            return Response(response, status=status.HTTP_200_OK)
+
+        serializer = PostListSerializer(posts, many=True)
+        response = SuccessResponseBuilder().with_message("카테고리 내 글 목록 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post 작성: 멤버만 가능
+    @extend_schema(**PostSchema.create_post())
+    def post(self, request, category_id):
+        category = get_object_with_permission(self, PostCategory, category_id, request)
+        member = get_member_from_obj(category)
+        serializer = PostSerializer(data=request.data)
+        if serializer.is_valid():
+            post = serializer.save(category=category, author=member)
+            increase_count(post)
+            response = SuccessResponseBuilder().with_message("글 작성 성공").with_data(serializer.data).build()
+            return Response(response, status=status.HTTP_201_CREATED)
+
+        response = ErrorResponseBuilder().with_message("글 작성 실패").with_errors(serializer.errors).build()
+        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Post by Community API View
+class PostByCommunityAPIView(APIView):
+    permission_classes = [IsMember]
+    pagination_class = PostPagination
+
+    # Post 목록 조회: 멤버만 가능
+    @extend_schema(**PostSchema.get_posts_by_community())
+    def get(self, request, community_id):
+        community = get_object_with_permission(self, Community, community_id, request)
+        member = get_member_from_obj(community)
+        blocked_member_ids = get_blocked_member_ids([member])
+
+        posts = Post.objects.filter(is_active=True, category__community=community).exclude(author_id__in=blocked_member_ids).select_related('author', 'category', 'category__community').annotate(
+            is_liked=Exists(PostLike.objects.filter(post=OuterRef('pk'), member=member)),
+            is_scraped=Exists(PostScrap.objects.filter(post=OuterRef('pk'), member=member)),
+            is_following=Exists(Follow.objects.filter(follower=member, following=OuterRef('author'), status=FollowStatus.ACCEPTED)),
+        ).order_by('-id')
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(posts, request)
+        if page is not None:
+            serializer = PostListSerializer(page, many=True)
+            response = SuccessResponseBuilder().with_message("커뮤니티 내 글 목록 조회 성공").with_data(serializer.data).with_page_pagination(paginator, page).build()
+            return Response(response, status=status.HTTP_200_OK)
+        
+        serializer = PostListSerializer(posts, many=True)
+        response = SuccessResponseBuilder().with_message("커뮤니티 내 글 목록 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+    
+
+# Post by Member API View
+class PostByMemberAPIView(APIView):
+    permission_classes = [IsMember]
+    pagination_class = PostPagination
+
+    @extend_schema(**PostSchema.get_posts_by_member())
+    def get(self, request):
+        members = Member.objects.filter(user=request.user)
+        community_ids = members.values_list('community_id', flat=True)
+        blocked_member_ids = get_blocked_member_ids(members)
+
+        posts = Post.objects.filter(category__community__in=community_ids).exclude(author_id__in=blocked_member_ids).select_related('author', 'category', 'category__community').annotate(
+            is_liked=Exists(PostLike.objects.filter(post=OuterRef('pk'), member__user=request.user, member__community=OuterRef('category__community'))),
+            is_scraped=Exists(PostScrap.objects.filter(post=OuterRef('pk'), member__user=request.user, member__community=OuterRef('category__community'))),
+            is_following=Exists(Follow.objects.filter(follower__user=request.user, follower__community=OuterRef('category__community'), following=OuterRef('author'), status=FollowStatus.ACCEPTED)),
+        ).distinct().order_by('-id')
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(posts, request)
+
+        if page is not None:
+            serializer = PostListSerializer(page, many=True)
+            response = SuccessResponseBuilder().with_message("커뮤니티 내 글 목록 조회 성공").with_data(serializer.data).with_page_pagination(paginator, page).build()
+            return Response(response, status=status.HTTP_200_OK)
+        
+        serializer = PostListSerializer(posts, many=True)
+        response = SuccessResponseBuilder().with_message("커뮤니티 내 글 목록 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post by Favorite Community API View
+class PostByFavoriteCommunityAPIView(APIView):
+    permission_classes = [IsMember]
+    pagination_class = PostPagination
+
+    # 즐겨찾는 커뮤니티의 Post 목록 조회: 멤버만 가능
+    @extend_schema(**PostSchema.get_posts_by_favorite_community())
+    def get(self, request):
+        members = Member.objects.filter(user=request.user)
+        blocked_member_ids = get_blocked_member_ids(members)
+        favorite_community_ids = CommunityFavorite.objects.filter(member__in=members).values_list('community_id', flat=True)
+
+        posts = Post.objects.filter(category__community__in=favorite_community_ids).exclude(author_id__in=blocked_member_ids).select_related('author', 'category', 'category__community').annotate(
+            is_liked=Exists(PostLike.objects.filter(post=OuterRef('pk'), member__user=request.user, member__community=OuterRef('category__community'))),
+            is_scraped=Exists(PostScrap.objects.filter(post=OuterRef('pk'), member__user=request.user, member__community=OuterRef('category__community'))),
+            is_following=Exists(Follow.objects.filter(follower__user=request.user, follower__community=OuterRef('category__community'), following=OuterRef('author'), status=FollowStatus.ACCEPTED)),
+        ).distinct().order_by('-id')
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(posts, request)
+        if page is not None:
+            serializer = PostListSerializer(page, many=True)
+            response = SuccessResponseBuilder().with_message("커뮤니티 내 글 목록 조회 성공").with_data(serializer.data).with_page_pagination(paginator, page).build()
+            return Response(response, status=status.HTTP_200_OK)
+        
+        serializer = PostListSerializer(posts, many=True)
+        response = SuccessResponseBuilder().with_message("커뮤니티 내 글 목록 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post by Favorite Category in Community API View
+class PostByFavoriteCategoryAPIView(APIView):
+    permission_classes = [IsMember]
+    pagination_class = PostPagination
+
+    # 즐겨찾는 카테고리의 Post 목록 조회: 본인만 가능
+    @extend_schema(**PostSchema.get_posts_by_favorite_category())
+    def get(self, request, community_id):
+        community = get_object_with_permission(self, Community, community_id, request)
+        member = get_member_from_obj(community)
+        blocked_member_ids = get_blocked_member_ids([member])
+        favorite_category_ids = PostCategoryFavorite.objects.filter(member=member, category__community=community).values_list('category_id', flat=True)
+        posts = Post.objects.filter(category_id__in=favorite_category_ids, category__community=community).exclude(author_id__in=blocked_member_ids).select_related('author', 'category', 'category__community').annotate(
+            is_liked=Exists(PostLike.objects.filter(post=OuterRef('pk'), member=member)),
+            is_scraped=Exists(PostScrap.objects.filter(post=OuterRef('pk'), member=member)),
+            is_following=Exists(Follow.objects.filter(follower=member, following=OuterRef('author'), status=FollowStatus.ACCEPTED)),
+        ).distinct().order_by('-id')
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(posts, request)
+        if page is not None:
+            serializer = PostListSerializer(page, many=True)
+            response = SuccessResponseBuilder().with_message("커뮤니티 내 글 목록 조회 성공").with_data(serializer.data).with_page_pagination(paginator, page).build()
+            return Response(response, status=status.HTTP_200_OK)
+        
+        serializer = PostListSerializer(posts, many=True)
+        response = SuccessResponseBuilder().with_message("커뮤니티 내 글 목록 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post Detail APIView
+class PostDetailAPIView(APIView):
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsMember()]
+        else :
+            return [IsMemberAuthor()]
+
+    # Post 상세 조회: 멤버만 가능
+    @extend_schema(**PostSchema.get_post_detail())
+    def get(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request, queryset=Post.objects.select_related('author', 'category', 'category__community'))
+        member = get_member_from_obj(post)
+        blocked_member_ids = get_blocked_member_ids([member])
+        if post.author_id in blocked_member_ids:
+            response = ErrorResponseBuilder().with_message("Post 상세 조회 실패").with_errors({'detail': '차단된 멤버입니다.'}).build()
+            return Response(response, status=status.HTTP_403_FORBIDDEN)
+
+        post.is_liked = PostLike.objects.filter(post=post, member=member).exists()
+        post.is_scraped = PostScrap.objects.filter(post=post, member=member).exists()
+        post.is_following = Follow.objects.filter(follower=member, following=post.author, status=FollowStatus.ACCEPTED).exists()
+        serializer = PostDetailSerializer(post)
+        response = SuccessResponseBuilder().with_message("Post 상세 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post 수정: 멤버이면서 작성자만 가능
+    @extend_schema(**PostSchema.update_post())
+    def put(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request)
+        serializer = PostSerializer(post, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            response = SuccessResponseBuilder().with_message("Post 수정 성공").with_data(serializer.data).build()
+            return Response(response, status=status.HTTP_200_OK)
+
+        response = ErrorResponseBuilder().with_message("Post 수정 실패").with_errors(serializer.errors).build()
+        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # Post 삭제: 멤버이면서 작성자만 가능
+    @extend_schema(**PostSchema.delete_post())
+    def delete(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request)
+        member = get_member_from_obj(post)
+        decrease_count(post)
+        post.delete()
+        response = SuccessResponseBuilder().with_message("Post 삭제 성공").build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post Like APIView
+class PostLikeAPIView(APIView):
+    permission_classes = [IsMember]
+    
+    # Post 좋아요 여부 조회: 멤버이면서 본인만 가능
+    @extend_schema(**PostSchema.get_like_status())
+    def get(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request)
+        member = get_member_from_obj(post)
+        liked = PostLike.objects.filter(member=member, post=post).exists()
+        response = SuccessResponseBuilder().with_message("Post 좋아요 여부 조회 성공").with_data({'liked': liked}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post 좋아요: 멤버이면서 본인만 가능
+    @extend_schema(**PostSchema.create_like())
+    def post(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request)
+        member = get_member_from_obj(post)
+        post_like, created = PostLike.objects.get_or_create(member=member, post=post)
+        if created:
+            increase_count(post_like)
+        response = SuccessResponseBuilder().with_message("Post 좋아요 성공").with_data({'liked': True}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post 좋아요 취소: 멤버이면서 본인만 가능
+    @extend_schema(**PostSchema.delete_like())
+    def delete(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request)
+        member = get_member_from_obj(post)
+        post_like = PostLike.objects.filter(member=member, post=post).first()
+        if post_like:
+            decrease_count(post_like)
+            post_like.delete()
+        response = SuccessResponseBuilder().with_message("Post 좋아요 취소 성공").with_data({'liked': False}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post Scrap APIView
+class PostScrapAPIView(APIView):
+    permission_classes = [IsMember]
+
+    # Post 스크랩 여부 조회: 멤버이면서 본인만 가능
+    @extend_schema(**PostSchema.get_scrap_status())
+    def get(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request)
+        scraped = PostScrap.objects.filter(member=post._member, post=post).exists()
+        response = SuccessResponseBuilder().with_message("Post 스크랩 여부 조회 성공").with_data({'scraped': scraped}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post 스크랩: 멤버이면서 본인만 가능
+    @extend_schema(**PostSchema.create_scrap())
+    def post(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request)
+        post_scrap, created = PostScrap.objects.get_or_create(member=post._member, post=post)
+        if created:
+            increase_count(post_scrap)
+        response = SuccessResponseBuilder().with_message("Post 스크랩 성공").with_data({'scraped': True}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post 스크랩 취소: 멤버이면서 본인만 가능
+    @extend_schema(**PostSchema.delete_scrap())
+    def delete(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request)
+        post_scrap = PostScrap.objects.filter(member=post._member, post=post).first()
+        if post_scrap:
+            decrease_count(post_scrap)
+            post_scrap.delete()
+        response = SuccessResponseBuilder().with_message("Post 스크랩 취소 성공").with_data({'scraped': False}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post Comment
+# <-------------------------------------------------------------------------------------------------------------------------------->
+# Post Comment APIView
+class PostCommentAPIView(APIView):
+    permission_classes = [IsMember]
+    pagination_class = PostCommentPagination
+
+    # Post Comment 목록 조회: 멤버만 가능
+    @extend_schema(**PostCommentSchema.get_comments())
+    def get(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request, queryset=Post.objects.select_related('author'))
+        member = get_member_from_obj(post)
+        blocked_member_ids = get_blocked_member_ids([member])
+        comments = post.post_comments.all().exclude(author_id__in=blocked_member_ids).annotate(
+            is_liked=Exists(PostCommentLike.objects.filter(comment=OuterRef('pk'), member=member)),
+        ).order_by('-id')
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(comments, request)
+        if page is not None:
+            serializer = PostCommentSerializer(page, many=True)
+            response = SuccessResponseBuilder().with_message("Post Comment 목록 조회 성공").with_data(serializer.data).with_page_pagination(paginator, page).build()
+            return Response(response, status=status.HTTP_200_OK)
+
+        serializer = PostCommentSerializer(comments, many=True)
+        response = SuccessResponseBuilder().with_message("Post Comment 목록 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+    
+    # Post Comment 작성: 멤버만 가능
+    @extend_schema(**PostCommentSchema.create_comment())
+    def post(self, request, post_id):
+        post = get_object_with_permission(self, Post, post_id, request)
+        member = get_member_from_obj(post)
+        serializer = PostCommentSerializer(data=request.data)
+        if serializer.is_valid():
+            post_comment = serializer.save(author=member, post=post)
+            increase_count(post_comment)
+            response = SuccessResponseBuilder().with_message("Post Comment 작성 성공").with_data(serializer.data).build()
+            return Response(response, status=status.HTTP_201_CREATED)
+
+        response = ErrorResponseBuilder().with_message("Post Comment 작성 실패").with_errors(serializer.errors).build()
+        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Post Comment Detail APIView
+class PostCommentDetailAPIView(APIView):
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsMember()]
+        else :
+            return [IsMemberAuthor()]
+
+    # Post Comment 상세 조회: 멤버만 가능
+    @extend_schema(**PostCommentSchema.get_comment_detail())
+    def get(self, request, comment_id):
+        comment = get_object_with_permission(self, PostComment, comment_id, request)
+        member = get_member_from_obj(comment)
+        blocked_member_ids = get_blocked_member_ids([member])
+        if comment.author_id in blocked_member_ids:
+            response = ErrorResponseBuilder().with_message("Post Comment 상세 조회 실패").with_errors({'detail': '차단된 멤버입니다.'}).build()
+            return Response(response, status=status.HTTP_403_FORBIDDEN)
+
+        comment.is_liked = PostCommentLike.objects.filter(comment=comment, member=member).exists()
+        serializer = PostCommentSerializer(comment)
+        response = SuccessResponseBuilder().with_message("Post Comment 상세 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post Comment 수정: 멤버이면서 작성자만 가능
+    @extend_schema(**PostCommentSchema.update_comment())
+    def put(self, request, comment_id):
+        comment = get_object_with_permission(self, PostComment, comment_id, request)
+        serializer = PostCommentSerializer(comment, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            response = SuccessResponseBuilder().with_message("Post Comment 수정 성공").with_data(serializer.data).build()
+            return Response(response, status=status.HTTP_200_OK)
+        
+        response = ErrorResponseBuilder().with_message("Post Comment 수정 실패").with_errors(serializer.errors).build()
+        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # Post Comment 삭제: 멤버이면서 작성자만 가능
+    @extend_schema(**PostCommentSchema.delete_comment())
+    def delete(self, request, comment_id):
+        comment = get_object_with_permission(self, PostComment, comment_id, request)
+        has_replies = comment.post_replies.exists()
+        decrease_count(comment)
+        if has_replies:
+            comment.soft_delete()   # Soft delete (대댓글이 있으면 실제 삭제하지 않음)
+        else:
+            comment.delete()        # 대댓글이 없으면 실제 삭제
+        response = SuccessResponseBuilder().with_message("Post Comment 삭제 성공").build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post Comment Like APIView
+class PostCommentLikeAPIView(APIView):
+    permission_classes = [IsMember]
+
+    # Post Comment 좋아요 여부 조회: 멤버이면서 본인만 가능
+    @extend_schema(**PostCommentSchema.get_like_status())
+    def get(self, request, comment_id):
+        comment = get_object_with_permission(self, PostComment, comment_id, request)
+        liked = PostCommentLike.objects.filter(member=comment._member, comment=comment).exists()
+        response = SuccessResponseBuilder().with_message("Post Comment 좋아요 여부 조회 성공").with_data({'liked': liked}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post Comment 좋아요: 멤버이면서 본인만 가능
+    @extend_schema(**PostCommentSchema.create_like())
+    def post(self, request, comment_id):
+        comment = get_object_with_permission(self, PostComment, comment_id, request)
+        member = get_member_from_obj(comment)
+        post_comment_like, created = PostCommentLike.objects.get_or_create(member=member, comment=comment)
+        if created:
+            increase_count(post_comment_like)
+        response = SuccessResponseBuilder().with_message("Post Comment 좋아요 성공").with_data({'liked': True}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post Comment 좋아요 취소: 멤버이면서 본인만 가능
+    @extend_schema(**PostCommentSchema.delete_like())
+    def delete(self, request, comment_id):
+        comment = get_object_with_permission(self, PostComment, comment_id, request)
+        member = get_member_from_obj(comment)
+        post_comment_like = PostCommentLike.objects.filter(member=member, comment=comment).first()
+        if post_comment_like:
+            decrease_count(post_comment_like)
+            post_comment_like.delete()
+        response = SuccessResponseBuilder().with_message("Post Comment 좋아요 취소 성공").with_data({'liked': False}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post Reply
+# <-------------------------------------------------------------------------------------------------------------------------------->
+# Post Reply APIView
+class PostReplyAPIView(APIView):
+    permission_classes = [IsMember]
+    pagination_class = PostReplyPagination
+
+    # Post Reply 목록 조회: 멤버만 가능
+    @extend_schema(**PostReplySchema.get_replies())
+    def get(self, request, comment_id):
+        comment = get_object_with_permission(self, PostComment, comment_id, request)
+        member = get_member_from_obj(comment)
+        blocked_member_ids = get_blocked_member_ids([member])
+        replies = comment.post_replies.all().exclude(author_id__in=blocked_member_ids).order_by('-id')
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(replies, request)
+
+        if page is not None:
+            serializer = PostReplySerializer(page, many=True)
+            response = SuccessResponseBuilder().with_message("Post Reply 목록 조회 성공").with_data(serializer.data).with_page_pagination(paginator, page).build()
+            return Response(response, status=status.HTTP_200_OK)
+
+        serializer = PostReplySerializer(replies, many=True)
+        response = SuccessResponseBuilder().with_message("Post Reply 목록 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post Reply 작성: 멤버만 가능
+    @extend_schema(**PostReplySchema.create_reply())
+    def post(self, request, comment_id):
+        comment = get_object_with_permission(self, PostComment, comment_id, request)
+        member = get_member_from_obj(comment)
+        serializer = PostReplySerializer(data=request.data)
+        if serializer.is_valid():
+            post_reply = serializer.save(comment=comment, author=member)
+            increase_count(post_reply)
+            response = SuccessResponseBuilder().with_message("Post Reply 작성 성공").with_data(serializer.data).build()
+            return Response(response, status=status.HTTP_201_CREATED)
+
+        response = ErrorResponseBuilder().with_message("Post Reply 작성 실패").with_errors(serializer.errors).build()
+        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Post Reply Detail APIView
+class PostReplyDetailAPIView(APIView):
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsMember()]
+        else :
+            return [IsMemberAuthor()]
+
+    # Post Reply 상세 조회: 멤버만 가능
+    @extend_schema(**PostReplySchema.get_reply_detail())
+    def get(self, request, reply_id):
+        reply = get_object_with_permission(self, PostReply, reply_id, request)
+        member = get_member_from_obj(reply)
+        blocked_member_ids = get_blocked_member_ids([member])
+        if reply.author_id in blocked_member_ids:
+            response = ErrorResponseBuilder().with_message("Post Reply 상세 조회 실패").with_errors({'detail': '차단된 멤버입니다.'}).build()
+            return Response(response, status=status.HTTP_403_FORBIDDEN)
+
+        reply.is_liked = PostReplyLike.objects.filter(reply=reply, member=member).exists()
+        serializer = PostReplySerializer(reply)
+        response = SuccessResponseBuilder().with_message("Post Reply 상세 조회 성공").with_data(serializer.data).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post Reply 수정: 멤버이면서 작성자만 가능
+    @extend_schema(**PostReplySchema.update_reply())
+    def put(self, request, reply_id):
+        reply = get_object_with_permission(self, PostReply, reply_id, request)
+        serializer = PostReplySerializer(reply, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            response = SuccessResponseBuilder().with_message("Post Reply 수정 성공").with_data(serializer.data).build()
+            return Response(response, status=status.HTTP_200_OK)
+
+        response = ErrorResponseBuilder().with_message("Post Reply 수정 실패").with_errors(serializer.errors).build()
+        return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # Post Reply 삭제: 멤버이면서 작성자만 가능
+    @extend_schema(**PostReplySchema.delete_reply())
+    def delete(self, request, reply_id):
+        reply = get_object_with_permission(self, PostReply, reply_id, request)
+        decrease_count(reply)
+        reply.delete()
+        response = SuccessResponseBuilder().with_message("Post Reply 삭제 성공").build()
+        return Response(response, status=status.HTTP_200_OK)
+
+
+# Post Reply Like APIView
+class PostReplyLikeAPIView(APIView):
+    permission_classes = [IsMember]
+
+    # Post Reply 좋아요 여부 조회: 멤버이면서 본인만 가능
+    @extend_schema(**PostReplySchema.get_like_status())
+    def get(self, request, reply_id):
+        reply = get_object_with_permission(self, PostReply, reply_id, request)
+        liked = PostReplyLike.objects.filter(member=reply._member, reply=reply).exists()
+        response = SuccessResponseBuilder().with_message("Post Reply 좋아요 여부 조회 성공").with_data({'liked': liked}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post Reply 좋아요: 멤버이면서 본인만 가능
+    @extend_schema(**PostReplySchema.create_like())
+    def post(self, request, reply_id):
+        reply = get_object_with_permission(self, PostReply, reply_id, request)
+        member = get_member_from_obj(reply)
+        post_reply_like, created = PostReplyLike.objects.get_or_create(member=member, reply=reply)
+        if created:
+            increase_count(post_reply_like)
+        response = SuccessResponseBuilder().with_message("Post Reply 좋아요 성공").with_data({'liked': True}).build()
+        return Response(response, status=status.HTTP_200_OK)
+
+    # Post Reply 좋아요 취소: 멤버이면서 본인만 가능
+    @extend_schema(**PostReplySchema.delete_like())
+    def delete(self, request, reply_id):
+        reply = get_object_with_permission(self, PostReply, reply_id, request)
+        member = get_member_from_obj(reply)
+        post_reply_like = PostReplyLike.objects.filter(member=member, reply=reply).first()
+        if post_reply_like:
+            decrease_count(post_reply_like)
+            post_reply_like.delete()
+        response = SuccessResponseBuilder().with_message("Post Reply 좋아요 취소 성공").with_data({'liked': False}).build()
+        return Response(response, status=status.HTTP_200_OK)

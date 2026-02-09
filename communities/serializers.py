@@ -5,6 +5,7 @@ import uuid
 from rest_framework import serializers
 
 from .models import Community, Member, FollowStatus, Follow
+from .models import PostCategory, Post, PostLike, PostScrap, PostComment, PostCommentLike, PostReply, PostReplyLike
 
 # Community
 # <-------------------------------------------------------------------------------------------------------------------------------->
@@ -65,3 +66,84 @@ class FollowSerializer(serializers.ModelSerializer):
         model = Follow
         fields = ['id', 'follower', 'following', 'status', 'created_at', 'modified_at']
         read_only_fields = ['id', 'status', 'created_at', 'modified_at']
+
+
+# Post
+# <-------------------------------------------------------------------------------------------------------------------------------->
+class PostCategorySimpleSerializer(serializers.ModelSerializer):
+     class Meta:
+        model = PostCategory
+        fields = ['id', 'name', 'image', 'description', 'favorite_count', 'post_count', 'score']
+        read_only_fields = ['id', 'name', 'image', 'description', 'favorite_count', 'post_count', 'score']
+
+
+class PostCategorySerializer(serializers.ModelSerializer):
+    parent = PostCategorySimpleSerializer(read_only=True)
+
+    class Meta:
+        model = PostCategory
+        fields = ['id', 'parent', 'name', 'description', 'image', 'favorite_count', 'post_count', 'score', 'created_at', 'modified_at']
+
+
+class PostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ['id', 'category', 'author', 'title', 'content', 'images', 'is_anonymous']
+        read_only_fields = ['id', 'category', 'author', 'created_at', 'modified_at']
+
+
+class PostListSerializer(serializers.ModelSerializer):
+    author = MemberSimpleSerializer(read_only=True)
+    is_liked = serializers.BooleanField(read_only=True)
+    is_scraped = serializers.BooleanField(read_only=True)
+    is_following = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Post
+        fields = ['id', 'title', 'author', 'like_count', 'comment_count', 'scrap_count', 'score', 'is_liked', 'is_scraped', 'is_following', 'created_at', 'modified_at']
+
+
+class PostDetailSerializer(serializers.ModelSerializer):
+    author = MemberSimpleSerializer(read_only=True)
+    is_liked = serializers.BooleanField(read_only=True)
+    is_scraped = serializers.BooleanField(read_only=True)
+    is_following = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Post
+        fields = ['id', 'category', 'title', 'content', 'images', 'author', 'like_count', 'comment_count', 'reply_count', 'scrap_count', 'score', 'is_liked', 'is_scraped', 'is_following', 'created_at', 'modified_at']
+
+    
+
+class PostLikeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PostLike
+        fields = ['id', 'post', 'member', 'created_at']
+        read_only_fields = ['id', 'post', 'created_at', 'member']
+
+
+class PostScrapSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PostScrap
+        fields = ['id', 'post', 'member', 'created_at']
+        read_only_fields = ['id', 'post', 'created_at', 'member']
+
+
+class PostCommentSerializer(serializers.ModelSerializer):
+    author = MemberSimpleSerializer(read_only=True)
+    is_liked = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = PostComment
+        fields = ['id', 'post', 'content', 'image', 'author', 'like_count', 'reply_count', 'score', 'is_liked', 'created_at', 'modified_at', 'is_active']
+        read_only_fields = ['id', 'post', 'author', 'created_at', 'modified_at', 'is_active']
+
+
+class PostReplySerializer(serializers.ModelSerializer):
+    author = MemberSimpleSerializer(read_only=True)
+    is_liked = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = PostReply
+        fields = ['id', 'comment', 'content', 'image', 'author', 'like_count', 'score', 'is_liked', 'created_at', 'modified_at', 'is_active']
+        read_only_fields = ['id', 'comment', 'author', 'created_at', 'modified_at', 'is_active']

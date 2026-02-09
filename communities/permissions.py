@@ -35,3 +35,26 @@ class IsProfileReadable(BasePermission):
 
         # 4. 비공개 계정 → 팔로워만
         return Follow.objects.filter(follower=current_member, following=obj, status=FollowStatus.ACCEPTED).exists()
+
+
+class IsMember(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        member = getattr(obj, '_member', None)
+        return member and member.is_active
+
+
+class IsMemberAuthor(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        member = getattr(obj, '_member', None)       
+        if hasattr(obj, "author") and obj.author == member:
+            return True
+        
+        if member.is_staff == True:
+            return True
+        return False
