@@ -1,13 +1,14 @@
 # accounts/tasks.py
 app_name = "accounts"
 
-from celery import shared_task
+from django.tasks import task
 
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 
-@shared_task
-def send_verification_email(email, code):
+
+@task
+def send_verification_email(email: str, code: str) -> bool:
     subject = "Your Verification Code"
 
     html_content = render_to_string("verification_email.html", {"code": code})
@@ -26,6 +27,8 @@ def send_verification_email(email, code):
 
     return True
 
-@shared_task
-def send_verification_sms(mobile, code):
-    pass
+
+@task
+def send_verification_sms(mobile: str, code: str) -> bool:
+    # TODO: Implement SMS verification provider logic (e.g. Aligo, CoolSMS, Twilio, etc.)
+    return True
