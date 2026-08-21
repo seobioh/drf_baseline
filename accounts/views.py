@@ -264,7 +264,7 @@ class SendVerificationView(APIView):
                 target=target,
                 defaults={'verification_code': verification_code, 'created_at': now()}
             )
-            send_verification_sms(target, verification_code)     # send_verification_sms.delay(target, verification_code) for celery
+            send_verification_sms.enqueue(target, verification_code)
 
         else:
             if check_unique:
@@ -284,7 +284,7 @@ class SendVerificationView(APIView):
                 target=target,
                 defaults={'verification_code': verification_code, 'created_at': now()}
             )
-            send_verification_email(target, verification_code)   # send_verification_email.delay(target, verification_code) for celery
+            send_verification_email.enqueue(target, verification_code)
 
         response = SuccessResponseBuilder().with_message("인증번호 발송 완료").build()
         return Response(response, status=status.HTTP_200_OK)

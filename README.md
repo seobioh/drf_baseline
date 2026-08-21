@@ -7,12 +7,14 @@ It supports `.env` configuration, JWT authentication, CORS setup, static file ha
 
 ## 📦 Features
 
+- 🐍 Python 3.12+ & Django 6.0+
 - ✅ Django REST Framework
 - 🔐 JWT Authentication (SimpleJWT)
 - ⚙️ Environment-based settings (`dev` / `deploy`)
 - 🌐 CORS support
 - 📁 Static file configuration
 - 🐳 Dockerfile included
+- ⚡ Built-in Background Tasks (`django.tasks`)
 - 📧 Optional Celery + Redis integration for background tasks
 
 ---
@@ -36,7 +38,7 @@ It supports `.env` configuration, JWT authentication, CORS setup, static file ha
    python manage.py collectstatic
    ```
 4. **Install dependencies**
-   Make sure to use a virtual environment:
+   Make sure to use a virtual environment (Python 3.12+ is required for Django 6.0+):
    ```bash
    pip install -r requirements.txt
    ```
@@ -52,22 +54,6 @@ It supports `.env` configuration, JWT authentication, CORS setup, static file ha
 7. **Run deployment server**
    ```bash
    python manage.py runserver --settings=server.settings.deploy
-   ```
-
----
-
-## ⚠️ Celery & Redis Integration (Optional)
-
-This project **does not** include Celery/Redis by default.
-To enable email queuing (e.g., for sending verification codes):
-1. Clone the extended version:
-   👉 🔗 seobioh/server_baseline
-   ```python
-   send_verification_email(email, code)
-   ```
-2. Replace:
-   ```python
-   send_verification_email.delay(email, code)
    ```
 
 ---

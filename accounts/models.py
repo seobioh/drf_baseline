@@ -7,7 +7,8 @@ import hashlib
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
-from django_cryptography.fields import encrypt
+
+from .fields import EncryptedCharField
 
 class UserManager(BaseUserManager):
     def create_user(self, email, name, username=None, password=None, **extra_fields):
@@ -59,7 +60,7 @@ class User(AbstractBaseUser):
     username = models.CharField(max_length=24, unique=True, blank=True)
 
     # Optional fields
-    ci = encrypt(models.CharField(max_length=100, null=True, blank=True))
+    ci = EncryptedCharField(max_length=255, null=True, blank=True)
     ci_hash = models.CharField(max_length=64, unique=True, null=True, blank=True)
     profile_image = models.TextField(null=True, blank=True)
     birthday = models.DateField(null=True, blank=True)
