@@ -37,7 +37,7 @@ It supports `.env` configuration, JWT authentication, CORS setup, static file ha
    ```bash
    python manage.py collectstatic
    ```
-4. **Install dependencies**
+4. **Install dependencies**  
    Make sure to use a virtual environment (Python 3.12+ is required for Django 6.0+):
    ```bash
    pip install -r requirements.txt
