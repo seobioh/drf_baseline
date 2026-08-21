@@ -1,9 +1,10 @@
 import base64
 import hashlib
-from cryptography.fernet import Fernet, InvalidToken
 
 from django.conf import settings
 from django.db import models
+
+from cryptography.fernet import Fernet, InvalidToken
 
 
 def get_fernet_cipher() -> Fernet:
