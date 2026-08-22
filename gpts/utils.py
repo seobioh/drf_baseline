@@ -71,7 +71,7 @@ class GPTEmbeddingService:
         response = self.client.embeddings.create(input=texts, model=model)
         return [item.embedding for item in response.data]
 
-    def route_category(self, query: str, prompt: GPTPrompt = None) -> str:
+    def route_category(self, query: str, prompt: GPTPrompt = None, history: str = None) -> str:
         try:
             qs = GPTEmbeddingCategory.objects.filter(is_active=True)
             if prompt:
@@ -88,18 +88,20 @@ class GPTEmbeddingService:
 
             system_prompt = (
                 "You are an intent and category classifier for a knowledge retrieval system.\n"
-                "Given the available knowledge categories below, determine which ONE category is most relevant to the user query.\n"
+                "Given the available knowledge categories and conversation context below, determine which ONE category is most relevant to the user query.\n"
                 "If the query is casual chat, small talk, general conversation, or does not require domain knowledge from any category, respond with 'none'.\n"
                 "Respond ONLY with the category name or 'none' without quotes, punctuation, or explanations.\n\n"
                 f"Categories:\n{cat_lines}"
             )
 
+            messages = [{"role": "system", "content": system_prompt}]
+            if history:
+                messages.append({"role": "system", "content": f"Conversation History:\n{history}"})
+            messages.append({"role": "user", "content": query})
+
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query}
-                ],
+                messages=messages,
                 temperature=0.0,
                 max_tokens=20
             )
@@ -110,7 +112,7 @@ class GPTEmbeddingService:
         except Exception:
             return None
 
-    def find_similar(self, query: str, prompt: GPTPrompt = None, category: str = None, algorithm: str = "cosine", top_k: int = 3, embedding_model: str = None):
+    def find_similar(self, query: str, prompt: GPTPrompt = None, category: str = None, algorithm: str = "cosine", top_k: int = 3, embedding_model: str = None, history: str = None):
         model_to_use = embedding_model
 
         if isinstance(category, str) and category:
@@ -148,7 +150,8 @@ class GPTEmbeddingService:
         if not embeddings_list:
             return []
 
-        query_vec = self.get_embedding(query, model=model_to_use or self.DEFAULT_MODEL)
+        search_query = f"{history}\n{query}" if history else query
+        query_vec = self.get_embedding(search_query, model=model_to_use or self.DEFAULT_MODEL)
 
         results = []
         for item in embeddings_list:
@@ -177,6 +180,20 @@ class GPTService:
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
         self.embedding_service = GPTEmbeddingService()
 
+    def _get_history_text(self):
+        parts = []
+        if self.chat_room.summary:
+            parts.append(f"Summary: {self.chat_room.summary}")
+
+        qs = self.chat_room.messages.filter(role__in=["user", "assistant"])
+        if self.chat_room.last_summarized_message_id:
+            qs = qs.filter(id__gt=self.chat_room.last_summarized_message_id)
+
+        for m in qs.order_by("id"):
+            parts.append(f"{m.role}: {m.message}")
+
+        return "\n".join(parts)
+
     def _maybe_update_summary(self):
         last = self.chat_room.last_summarized_message
 
@@ -193,7 +210,6 @@ class GPTService:
             return
 
         summary_text = self._summarize(messages)
-
         self.chat_room.summary = summary_text
         self.chat_room.summary_token_count = len(summary_text) // 4
         self.chat_room.last_summarized_message = messages[-1]
@@ -266,11 +282,12 @@ class GPTService:
         if not use_embedding:
             return None, [], {"is_routed": False, "category": None, "use_embedding": False}
 
+        history_text = self._get_history_text()
         was_auto_routed = False
         target_category = category
         if not target_category:
             was_auto_routed = True
-            target_category = self.embedding_service.route_category(query=message, prompt=self.chat_room.prompt)
+            target_category = self.embedding_service.route_category(query=message, prompt=self.chat_room.prompt, history=history_text)
 
         routing_info = {
             "is_routed": bool(target_category),
@@ -286,7 +303,8 @@ class GPTService:
             prompt=self.chat_room.prompt,
             category=target_category,
             algorithm=embedding_algorithm,
-            top_k=top_k
+            top_k=top_k,
+            history=history_text
         )
 
         if relevant:

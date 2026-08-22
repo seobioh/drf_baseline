@@ -63,6 +63,7 @@ flowchart TD
 ### 3. Smart Category Router (`utils.py: GPTEmbeddingService.route_category`)
 - Dynamically queries all active `GPTEmbeddingCategory` records and their descriptions from `db.sqlite3`.
 - Calls `gpt-4o-mini` with `temperature=0.0` and `max_tokens=20` to classify query intent in under 50ms.
+- **Multi-turn Context Awareness**: In chat rooms, incorporates conversation history/summary into the router and search query so pronouns (e.g., "my car") resolve to previously mentioned entities (e.g., "Avante 2024").
 - Automatically skips RAG embedding retrieval for small talk and generic questions, avoiding unnecessary embedding API costs and latency.
 
 ### 4. Real-time SSE Stream Generator (`utils.py: GPTService`, `GPTSessionService`)
