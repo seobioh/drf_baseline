@@ -81,3 +81,54 @@ class GPTChatMessage(models.Model):
         if self.message:
             self.token_count = len(self.message) // 4
         super().save(*args, **kwargs)
+
+
+class GPTEmbeddingCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(null=True, blank=True)
+    embedding_model = models.CharField(max_length=100, default='text-embedding-3-small')
+    prompt = models.ForeignKey(GPTPrompt, on_delete=models.SET_NULL, null=True, blank=True, related_name='embedding_categories')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'GPT Embedding Category'
+        verbose_name_plural = 'GPT Embedding Categories'
+
+    def __str__(self):
+        return f"{self.name} ({self.embedding_model})"
+
+
+class GPTEmbedding(models.Model):
+    category = models.ForeignKey(GPTEmbeddingCategory, on_delete=models.CASCADE, related_name='embeddings')
+    title = models.CharField(max_length=200, null=True, blank=True)
+    content = models.TextField()
+
+    embedding = models.JSONField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'GPT Embedding'
+        verbose_name_plural = 'GPT Embeddings'
+
+    def __str__(self):
+        label = self.title if self.title else (self.content[:30] + '...' if len(self.content) > 30 else self.content)
+        return f"[{self.category.name}] {label}"
+
+    def save(self, *args, **kwargs):
+        if not self.embedding and self.content:
+            try:
+                from .utils import GPTEmbeddingService
+                service = GPTEmbeddingService()
+                model_to_use = self.category.embedding_model if self.category else 'text-embedding-3-small'
+                self.embedding = service.get_embedding(self.content, model=model_to_use)
+            except Exception:
+                pass
+        super().save(*args, **kwargs)

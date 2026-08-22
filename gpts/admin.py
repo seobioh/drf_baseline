@@ -3,7 +3,21 @@ app_name = "gpts"
 
 from django.contrib import admin
 
-from .models import GPTPrompt, GPTChatRoom, GPTChatMessage
+from .models import GPTPrompt, GPTChatRoom, GPTChatMessage, GPTEmbeddingCategory, GPTEmbedding
+
+class GPTEmbeddingInline(admin.TabularInline):
+    model = GPTEmbedding
+    extra = 0
+    fields = ('title', 'content', 'is_active')
+    show_change_link = True
+
+
+class GPTEmbeddingCategoryInline(admin.TabularInline):
+    model = GPTEmbeddingCategory
+    extra = 0
+    fields = ('name', 'embedding_model', 'is_active')
+    show_change_link = True
+
 
 @admin.register(GPTPrompt)
 class GPTPromptAdmin(admin.ModelAdmin):
@@ -11,6 +25,7 @@ class GPTPromptAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'created_at')
     list_editable = ('is_active',)
     search_fields = ('name',)
+    inlines = (GPTEmbeddingCategoryInline,)
 
     fieldsets = (
         ('Basic Information', {
@@ -79,3 +94,67 @@ class GPTChatMessageAdmin(admin.ModelAdmin):
         return obj.message[:50] + '...' if len(obj.message) > 50 else obj.message
 
     message_preview.short_description = 'Message'
+
+
+@admin.register(GPTEmbeddingCategory)
+class GPTEmbeddingCategoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'embedding_model', 'prompt', 'embedding_count', 'is_active', 'created_at')
+    list_filter = ('embedding_model', 'is_active', 'created_at')
+    list_editable = ('is_active',)
+    search_fields = ('name', 'description')
+    raw_id_fields = ('prompt',)
+    readonly_fields = ('created_at', 'modified_at')
+    inlines = (GPTEmbeddingInline,)
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'description', 'embedding_model', 'prompt')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'modified_at'),
+            'classes': ('collapse',)
+        })
+    )
+
+    def embedding_count(self, obj):
+        return obj.embeddings.count()
+    embedding_count.short_description = 'Embeddings Count'
+
+
+@admin.register(GPTEmbedding)
+class GPTEmbeddingAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'category', 'embedding_model', 'has_embedding', 'is_active', 'created_at')
+    list_filter = ('category', 'is_active', 'created_at')
+    list_editable = ('is_active',)
+    search_fields = ('title', 'content', 'category__name')
+    raw_id_fields = ('category',)
+    readonly_fields = ('created_at', 'modified_at')
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('category', 'title', 'content')
+        }),
+        ('Embedding Vector', {
+            'fields': ('embedding',),
+            'classes': ('collapse',)
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'modified_at'),
+            'classes': ('collapse',)
+        })
+    )
+
+    def embedding_model(self, obj):
+        return obj.category.embedding_model if obj.category else '-'
+    embedding_model.short_description = 'Embedding Model'
+
+    def has_embedding(self, obj):
+        return bool(obj.embedding)
+    has_embedding.boolean = True
+    has_embedding.short_description = 'Embedding Exists'

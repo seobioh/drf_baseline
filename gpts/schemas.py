@@ -24,6 +24,27 @@ class GPTChatMessageRequestSerializer(serializers.Serializer):
         default='gpt-4o-mini',
         help_text="사용할 GPT 모델 (선택, 기본값: gpt-4o-mini)"
     )
+    use_embedding = serializers.BooleanField(
+        required=False,
+        default=True,
+        help_text="DB 임베딩 지식 검색 활용 여부 (선택, 기본값: True)"
+    )
+    embedding_algorithm = serializers.ChoiceField(
+        choices=['cosine', 'dot_product', 'euclidean', 'manhattan'],
+        required=False,
+        default='cosine',
+        help_text="임베딩 유사도 계산 알고리즘 (선택, 기본값: cosine)"
+    )
+    category = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="검색할 특정 지식 분야/카테고리명 (선택, 미지정 시 전체 검색)"
+    )
+    top_k = serializers.IntegerField(
+        required=False,
+        default=3,
+        help_text="주입할 상위 컨텍스트 개수 (선택, 기본값: 3)"
+    )
 
 
 class GPTStartRequestSerializer(serializers.Serializer):
@@ -35,6 +56,27 @@ class GPTStartRequestSerializer(serializers.Serializer):
         default='gpt-4o-mini',
         help_text="사용할 GPT 모델 (선택, 기본값: gpt-4o-mini)"
     )
+    use_embedding = serializers.BooleanField(
+        required=False,
+        default=True,
+        help_text="DB 임베딩 지식 검색 활용 여부 (선택, 기본값: True)"
+    )
+    embedding_algorithm = serializers.ChoiceField(
+        choices=['cosine', 'dot_product', 'euclidean', 'manhattan'],
+        required=False,
+        default='cosine',
+        help_text="임베딩 유사도 계산 알고리즘 (선택, 기본값: cosine)"
+    )
+    category = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="검색할 특정 지식 분야/카테고리명 (선택, 미지정 시 전체 검색)"
+    )
+    top_k = serializers.IntegerField(
+        required=False,
+        default=3,
+        help_text="주입할 상위 컨텍스트 개수 (선택, 기본값: 3)"
+    )
 
 
 class GPTSessionRequestSerializer(serializers.Serializer):
@@ -45,6 +87,27 @@ class GPTSessionRequestSerializer(serializers.Serializer):
         required=False,
         default='gpt-4o-mini',
         help_text="사용할 GPT 모델 (선택, 기본값: gpt-4o-mini)"
+    )
+    use_embedding = serializers.BooleanField(
+        required=False,
+        default=True,
+        help_text="DB 임베딩 지식 검색 활용 여부 (선택, 기본값: True)"
+    )
+    embedding_algorithm = serializers.ChoiceField(
+        choices=['cosine', 'dot_product', 'euclidean', 'manhattan'],
+        required=False,
+        default='cosine',
+        help_text="임베딩 유사도 계산 알고리즘 (선택, 기본값: cosine)"
+    )
+    category = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="검색할 특정 지식 분야/카테고리명 (선택, 미지정 시 전체 검색)"
+    )
+    top_k = serializers.IntegerField(
+        required=False,
+        default=3,
+        help_text="주입할 상위 컨텍스트 개수 (선택, 기본값: 3)"
     )
 
 
