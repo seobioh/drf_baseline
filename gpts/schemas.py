@@ -35,10 +35,10 @@ class GPTChatMessageRequestSerializer(serializers.Serializer):
         default='cosine',
         help_text="임베딩 유사도 계산 알고리즘 (선택, 기본값: cosine)"
     )
-    category = serializers.CharField(
+    categories = serializers.ListField(
+        child=serializers.CharField(),
         required=False,
-        allow_blank=True,
-        help_text="검색할 특정 지식 분야/카테고리명 (선택, 미지정 시 전체 검색)"
+        help_text="검색할 특정 지식 분야/카테고리명 목록 (선택, 미지정 시 자동 라우팅)"
     )
     top_k = serializers.IntegerField(
         required=False,
@@ -67,10 +67,10 @@ class GPTStartRequestSerializer(serializers.Serializer):
         default='cosine',
         help_text="임베딩 유사도 계산 알고리즘 (선택, 기본값: cosine)"
     )
-    category = serializers.CharField(
+    categories = serializers.ListField(
+        child=serializers.CharField(),
         required=False,
-        allow_blank=True,
-        help_text="검색할 특정 지식 분야/카테고리명 (선택, 미지정 시 전체 검색)"
+        help_text="검색할 특정 지식 분야/카테고리명 목록 (선택, 미지정 시 자동 라우팅)"
     )
     top_k = serializers.IntegerField(
         required=False,
@@ -99,10 +99,10 @@ class GPTSessionRequestSerializer(serializers.Serializer):
         default='cosine',
         help_text="임베딩 유사도 계산 알고리즘 (선택, 기본값: cosine)"
     )
-    category = serializers.CharField(
+    categories = serializers.ListField(
+        child=serializers.CharField(),
         required=False,
-        allow_blank=True,
-        help_text="검색할 특정 지식 분야/카테고리명 (선택, 미지정 시 전체 검색)"
+        help_text="검색할 특정 지식 분야/카테고리명 목록 (선택, 미지정 시 자동 라우팅)"
     )
     top_k = serializers.IntegerField(
         required=False,

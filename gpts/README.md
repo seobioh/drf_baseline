@@ -1,10 +1,10 @@
-# 🤖 GPTS App - RAG & Smart Auto-Routing Architecture
+# 🤖 GPTS App - Multi-Category RAG & Smart Auto-Routing Architecture
 
-The `gpts` Django app provides an intelligent, production-ready AI chat service featuring **scoped Retrieval-Augmented Generation (RAG)**, **intent-based category auto-routing**, and **real-time Server-Sent Events (SSE) streaming**.
+The `gpts` Django app provides an intelligent, production-ready AI chat service featuring **multi-category scoped Retrieval-Augmented Generation (RAG)**, **intent-based multi-domain auto-routing**, and **real-time Server-Sent Events (SSE) streaming**.
 
 ## 🏗️ Architecture & Pipeline Flowchart
 
-When a user submits a question without specifying a category (`category=None`), the system leverages a lightweight router classifier (`GPT-4o-mini`, `temperature=0.0`) to dynamically resolve the user's intent against active categories in the database before vector retrieval.
+When a user submits a question without specifying categories (`categories=None`), the system leverages a lightweight router classifier (`GPT-4o-mini`, `temperature=0.0`) to dynamically resolve single or multiple relevant categories from active categories in the database before vector retrieval.
 
 ```mermaid
 flowchart TD
@@ -13,31 +13,31 @@ flowchart TD
     end
 
     subgraph Router["2. Smart Intent Router"]
-        Check{"Category Specified?"}
-        LLMRouter["🤖 route_category<br/>(GPT-4o-mini Zero-Shot Classifier)"]
-        Decision{"Category Decision"}
+        Check{"Categories Specified?"}
+        LLMRouter["🤖 route_categories<br/>(GPT-4o-mini Zero-Shot Multi-Label Classifier)"]
+        Decision{"Matched Categories"}
     end
 
-    subgraph Retrieval["3. Knowledge Retrieval (RAG)"]
-        DBLoad["📁 Load Category Embeddings from DB"]
+    subgraph Retrieval["3. Multi-Category Knowledge Retrieval (RAG)"]
+        DBLoad["📁 Load Multi-Category Embeddings from DB"]
         VecGen["🔢 Generate 1536-dim Query Vector<br/>(text-embedding-3-small)"]
-        Similarity["📐 Cosine Similarity Calculation & Top-K Ranking"]
+        Similarity["📐 Cosine / Vector Similarity Calculation & Top-K Ranking"]
     end
 
     subgraph Generation["4. LLM Generation & Streaming"]
-        Context["📝 Inject Reference Context into System Prompt"]
+        Context["📝 Inject Multi-Domain Reference Context into System Prompt"]
         Skip["💬 Direct Chat Prompt (RAG Skipped)"]
         LLM["⚡ GPT-4o-mini Completion"]
         SSE["📤 Real-Time SSE Stream<br/>(event: routing → context → data → done)"]
     end
 
     Req --> Check
-    Check -- "Yes (Explicit Category)" --> DBLoad
-    Check -- "No (category=None)" --> LLMRouter
+    Check -- "Yes (e.g. ['car_manual', 'cs_faq'])" --> DBLoad
+    Check -- "No (categories=None)" --> LLMRouter
     LLMRouter --> Decision
 
-    Decision -- "Matched (e.g., 'car_manual')" --> DBLoad
-    Decision -- "None (Smalltalk / General Chat)" --> Skip
+    Decision -- "Matched (1 or more domains)" --> DBLoad
+    Decision -- "Empty / [] (Smalltalk / General Chat)" --> Skip
 
     DBLoad --> VecGen --> Similarity --> Context
     Context --> LLM
@@ -60,9 +60,9 @@ flowchart TD
 - **Euclidean Similarity**: `1 / (1 + ||u - v||)`
 - **Manhattan Similarity**: `1 / (1 + sum(|u_i - v_i|))`
 
-### 3. Smart Category Router (`utils.py: GPTEmbeddingService.route_category`)
+### 3. Smart Multi-Category Router (`utils.py: GPTEmbeddingService.route_categories`)
 - Dynamically queries all active `GPTEmbeddingCategory` records and their descriptions from `db.sqlite3`.
-- Calls `gpt-4o-mini` with `temperature=0.0` and `max_tokens=20` to classify query intent in under 50ms.
+- Calls `gpt-4o-mini` with `temperature=0.0` to classify query intent into zero, one, or multiple categories simultaneously.
 - **Multi-turn Context Awareness**: In chat rooms, incorporates conversation history/summary into the router and search query so pronouns (e.g., "my car") resolve to previously mentioned entities (e.g., "Avante 2024").
 - Automatically skips RAG embedding retrieval for small talk and generic questions, avoiding unnecessary embedding API costs and latency.
 
@@ -77,8 +77,8 @@ flowchart TD
 | Event Name | Sample Payload (`data`) | Description |
 | :--- | :--- | :--- |
 | `event: init` | `{"room_id": 1}` | *(Chat room creation)* Emits new chat room ID. |
-| `event: routing` | `{"is_routed": true, "category": "car_manual", "was_auto_routed": true}` | **Real-time decision transparency**: category matched & RAG flag. |
-| `event: context` | `{"category": "car_manual", "relevant_contexts": [...], "algorithm": "cosine"}` | Matched reference knowledge documents with similarity scores. |
+| `event: routing` | `{"is_routed": true, "categories": ["car_manual", "cs_faq"], "was_auto_routed": true}` | **Real-time decision transparency**: matched categories & RAG flag. |
+| `event: context` | `{"categories": ["car_manual", "cs_faq"], "relevant_contexts": [...], "algorithm": "cosine"}` | Matched multi-domain reference knowledge documents with similarity scores. |
 | `data: <token>` | `Avante`, ` 2024`, ` fuel`, ` economy` ... | Raw UTF-8 token streamed from GPT model. |
 | `event: meta` | `{"room_id": 1, "room_name": "Avante Specifications", ...}` | *(First message)* AI-generated short room title. |
 | `event: done` | `{"assistant_id": 2}` or `end` | Completion indicator. |
@@ -90,14 +90,15 @@ flowchart TD
 All endpoints require `Authorization: Bearer <JWT_ACCESS_TOKEN>` header and return `Content-Type: text/event-stream`.
 
 ### 1. Start Chat Room (`POST /gpts/start`)
-Creates a new persistent room, routes category, injects knowledge, generates title, and streams response.
+Creates a new persistent room, routes categories, injects knowledge, generates title, and streams response.
 ```json
 {
-  "message": "What is the fuel efficiency and engine type of Avante?",
+  "message": "What is the fuel efficiency of Avante and what is the refund policy?",
   "model": "gpt-4o-mini",
   "use_embedding": true,
   "embedding_algorithm": "cosine",
-  "top_k": 3
+  "categories": ["car_manual", "cs_faq"],
+  "top_k": 5
 }
 ```
 

@@ -71,7 +71,7 @@ class GPTEmbeddingService:
         response = self.client.embeddings.create(input=texts, model=model)
         return [item.embedding for item in response.data]
 
-    def route_category(self, query: str, prompt: GPTPrompt = None, history: str = None) -> str:
+    def route_categories(self, query: str, prompt: GPTPrompt = None, history: str = None) -> list[str]:
         try:
             qs = GPTEmbeddingCategory.objects.filter(is_active=True)
             if prompt:
@@ -81,16 +81,19 @@ class GPTEmbeddingService:
 
             categories = list(qs)
             if not categories:
-                return None
+                return []
 
             cat_names = {c.name.lower(): c.name for c in categories}
             cat_lines = "\n".join(f"- {c.name}: {c.description or c.name}" for c in categories)
 
             system_prompt = (
-                "You are an intent and category classifier for a knowledge retrieval system.\n"
-                "Given the available knowledge categories and conversation context below, determine which ONE category is most relevant to the user query.\n"
-                "If the query is casual chat, small talk, general conversation, or does not require domain knowledge from any category, respond with 'none'.\n"
-                "Respond ONLY with the category name or 'none' without quotes, punctuation, or explanations.\n\n"
+                "You are an intent and multi-category classifier for a knowledge retrieval system.\n"
+                "Given the available knowledge categories and conversation context below, select ALL categories that are relevant to the user's query.\n"
+                "Important Rules:\n"
+                "1. If the query touches upon multiple topics, domains, or entities (e.g. asking about car models/features AND payment/refunds AND points/coupons), include ALL relevant categories in the array.\n"
+                "2. Check entities, keywords, and user intents carefully against each category description.\n"
+                "3. If the query is casual chat, small talk, general conversation, or general facts/coding that do not require knowledge from any domain category, respond with [].\n"
+                "4. Respond ONLY with a valid JSON array of category names (e.g. [\"car_manual\", \"cs_faq\"]) without markdown formatting, backticks, or explanations.\n\n"
                 f"Categories:\n{cat_lines}"
             )
 
@@ -103,31 +106,49 @@ class GPTEmbeddingService:
                 model="gpt-4o-mini",
                 messages=messages,
                 temperature=0.0,
-                max_tokens=20
+                max_tokens=50
             )
 
-            selected = response.choices[0].message.content.strip().lower()
-            return cat_names.get(selected)
-        
-        except Exception:
-            return None
+            raw_content = response.choices[0].message.content.strip()
+            if raw_content.startswith("```"):
+                raw_content = raw_content.strip("`").removeprefix("json").strip()
 
-    def find_similar(self, query: str, prompt: GPTPrompt = None, category: str = None, algorithm: str = "cosine", top_k: int = 3, embedding_model: str = None, history: str = None):
+            try:
+                parsed = json.loads(raw_content)
+                if isinstance(parsed, list):
+                    matched = [cat_names[str(item).lower()] for item in parsed if str(item).lower() in cat_names]
+                    return matched
+                elif isinstance(parsed, str) and parsed.lower() in cat_names:
+                    return [cat_names[parsed.lower()]]
+
+            except Exception:
+                # Fallback text matching
+                raw_lower = raw_content.lower()
+                matched = [name for key, name in cat_names.items() if key in raw_lower]
+                return matched
+
+            return []
+
+        except Exception:
+            return []
+
+    def find_similar(self, query: str, prompt: GPTPrompt = None, categories: list = None, algorithm: str = "cosine", top_k: int = 3, embedding_model: str = None, history: str = None):
         model_to_use = embedding_model
 
-        if isinstance(category, str) and category:
-            category_obj = GPTEmbeddingCategory.objects.filter(name=category, is_active=True).first()
-            if not category_obj:
+        target_cats = []
+        if categories:
+            if isinstance(categories, str):
+                target_cats = [c.strip() for c in categories.split(",") if c.strip()]
+            elif isinstance(categories, (list, tuple, set)):
+                target_cats = [str(c).strip() for c in categories if c]
+
+        if target_cats:
+            cat_objs = GPTEmbeddingCategory.objects.filter(name__in=target_cats, is_active=True)
+            if not cat_objs.exists():
                 return []
             if not model_to_use:
-                model_to_use = category_obj.embedding_model
-            qs = GPTEmbedding.objects.filter(category=category_obj, is_active=True).exclude(embedding__isnull=True)
-
-        elif isinstance(category, GPTEmbeddingCategory):
-            category_obj = category
-            if not model_to_use:
-                model_to_use = category_obj.embedding_model
-            qs = GPTEmbedding.objects.filter(category=category_obj, is_active=True).exclude(embedding__isnull=True)
+                model_to_use = cat_objs.first().embedding_model
+            qs = GPTEmbedding.objects.filter(category__in=cat_objs, is_active=True).exclude(embedding__isnull=True)
 
         elif prompt:
             prompt_categories = GPTEmbeddingCategory.objects.filter(prompt=prompt, is_active=True)
@@ -278,59 +299,66 @@ class GPTService:
 
         return context
 
-    def _retrieve_context(self, message: str, use_embedding=True, embedding_algorithm="cosine", category=None, top_k=3):
+    def _retrieve_context(self, message: str, use_embedding=True, embedding_algorithm="cosine", categories=None, top_k=3):
         if not use_embedding:
-            return None, [], {"is_routed": False, "category": None, "use_embedding": False}
+            return None, [], {"is_routed": False, "categories": [], "use_embedding": False}
 
         history_text = self._get_history_text()
         was_auto_routed = False
-        target_category = category
-        if not target_category:
+
+        target_categories = []
+        if categories:
+            if isinstance(categories, str):
+                target_categories = [c.strip() for c in categories.split(",") if c.strip()]
+            elif isinstance(categories, (list, tuple, set)):
+                target_categories = [str(c).strip() for c in categories if c]
+
+        if not target_categories:
             was_auto_routed = True
-            target_category = self.embedding_service.route_category(query=message, prompt=self.chat_room.prompt, history=history_text)
+            target_categories = self.embedding_service.route_categories(query=message, prompt=self.chat_room.prompt, history=history_text)
 
         routing_info = {
-            "is_routed": bool(target_category),
-            "category": target_category,
+            "is_routed": bool(target_categories),
+            "categories": target_categories,
             "was_auto_routed": was_auto_routed
         }
 
-        if not target_category:
+        if not target_categories:
             return None, [], routing_info
 
         relevant = self.embedding_service.find_similar(
             query=message,
             prompt=self.chat_room.prompt,
-            category=target_category,
+            categories=target_categories,
             algorithm=embedding_algorithm,
             top_k=top_k,
             history=history_text
         )
 
         if relevant:
-            context_str = "\n\n".join(f"[{i+1}] {item.get('title') or ''}\n{item['content']}".strip() for i, item in enumerate(relevant))
+            context_str = "\n\n".join(f"[{i+1}] ({item.get('category') or ''}) {item.get('title') or ''}\n{item['content']}".strip() for i, item in enumerate(relevant))
             return context_str, relevant, routing_info
 
         return None, [], routing_info
 
-    def handle(self, user_message: GPTChatMessage, use_embedding=True, embedding_algorithm="cosine", category=None, top_k=3) -> GPTChatMessage:
+    def handle(self, user_message: GPTChatMessage, use_embedding=True, embedding_algorithm="cosine", categories=None, top_k=3) -> GPTChatMessage:
         self._maybe_update_summary()
-        extra_context, _, _ = self._retrieve_context(message=user_message.message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, category=category, top_k=top_k)
+        extra_context, _, _ = self._retrieve_context(message=user_message.message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, categories=categories, top_k=top_k)
         messages = self._build_context(extra_context=extra_context)
         response = self.client.chat.completions.create(model=user_message.model, messages=messages, temperature=0.7)
         assistant_text = response.choices[0].message.content
         return GPTChatMessage.objects.create(chat_room=self.chat_room, role="assistant", model=user_message.model, message=assistant_text)
 
-    def stream(self, user_message: GPTChatMessage, use_embedding=True, embedding_algorithm="cosine", category=None, top_k=3):
+    def stream(self, user_message: GPTChatMessage, use_embedding=True, embedding_algorithm="cosine", categories=None, top_k=3):
         assistant_message = GPTChatMessage.objects.create(chat_room=self.chat_room, role="assistant", model=user_message.model, message="")
 
         try:
-            extra_context, relevant, routing_info = self._retrieve_context(message=user_message.message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, category=category, top_k=top_k)
+            extra_context, relevant, routing_info = self._retrieve_context(message=user_message.message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, categories=categories, top_k=top_k)
             if use_embedding:
                 yield f"event: routing\ndata: {json.dumps(routing_info, ensure_ascii=False)}\n\n"
 
             if relevant:
-                yield f"event: context\ndata: {json.dumps({'category': routing_info.get('category'), 'relevant_contexts': relevant, 'algorithm': embedding_algorithm}, ensure_ascii=False)}\n\n"
+                yield f"event: context\ndata: {json.dumps({'categories': routing_info.get('categories', []), 'relevant_contexts': relevant, 'algorithm': embedding_algorithm}, ensure_ascii=False)}\n\n"
 
             self._maybe_update_summary()
             messages = self._build_context(extra_context=extra_context)
@@ -363,17 +391,17 @@ class GPTService:
             assistant_message.save(update_fields=["is_error", "message"])
             yield f"event: error\ndata: {str(e)}\n\n"
 
-    def stream_with_init(self, user_message: GPTChatMessage, use_embedding=True, embedding_algorithm="cosine", category=None, top_k=3):
+    def stream_with_init(self, user_message: GPTChatMessage, use_embedding=True, embedding_algorithm="cosine", categories=None, top_k=3):
         yield f"event: init\ndata: {json.dumps({'room_id': self.chat_room.id})}\n\n"
         assistant_message = GPTChatMessage.objects.create(chat_room=self.chat_room, role="assistant", model=user_message.model, message="")
 
         try:
-            extra_context, relevant, routing_info = self._retrieve_context(message=user_message.message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, category=category, top_k=top_k)
+            extra_context, relevant, routing_info = self._retrieve_context(message=user_message.message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, categories=categories, top_k=top_k)
             if use_embedding:
                 yield f"event: routing\ndata: {json.dumps(routing_info, ensure_ascii=False)}\n\n"
 
             if relevant:
-                yield f"event: context\ndata: {json.dumps({'category': routing_info.get('category'), 'relevant_contexts': relevant, 'algorithm': embedding_algorithm}, ensure_ascii=False)}\n\n"
+                yield f"event: context\ndata: {json.dumps({'categories': routing_info.get('categories', []), 'relevant_contexts': relevant, 'algorithm': embedding_algorithm}, ensure_ascii=False)}\n\n"
 
             self._maybe_update_summary()
             messages = self._build_context(extra_context=extra_context)
@@ -421,45 +449,52 @@ class GPTSessionService:
         self.prompt = prompt
         self.embedding_service = GPTEmbeddingService()
 
-    def _retrieve_context(self, message: str, use_embedding=True, embedding_algorithm="cosine", category=None, top_k=3):
+    def _retrieve_context(self, message: str, use_embedding=True, embedding_algorithm="cosine", categories=None, top_k=3):
         if not use_embedding:
-            return None, [], {"is_routed": False, "category": None, "use_embedding": False}
+            return None, [], {"is_routed": False, "categories": [], "use_embedding": False}
 
         was_auto_routed = False
-        target_category = category
-        if not target_category:
+
+        target_categories = []
+        if categories:
+            if isinstance(categories, str):
+                target_categories = [c.strip() for c in categories.split(",") if c.strip()]
+            elif isinstance(categories, (list, tuple, set)):
+                target_categories = [str(c).strip() for c in categories if c]
+
+        if not target_categories:
             was_auto_routed = True
-            target_category = self.embedding_service.route_category(query=message, prompt=self.prompt)
+            target_categories = self.embedding_service.route_categories(query=message, prompt=self.prompt)
 
         routing_info = {
-            "is_routed": bool(target_category),
-            "category": target_category,
+            "is_routed": bool(target_categories),
+            "categories": target_categories,
             "was_auto_routed": was_auto_routed
         }
 
-        if not target_category:
+        if not target_categories:
             return None, [], routing_info
 
         relevant = self.embedding_service.find_similar(
             query=message,
             prompt=self.prompt,
-            category=target_category,
+            categories=target_categories,
             algorithm=embedding_algorithm,
             top_k=top_k
         )
 
         if relevant:
-            context_str = "\n\n".join(f"[{i+1}] {item.get('title') or ''}\n{item['content']}".strip() for i, item in enumerate(relevant))
+            context_str = "\n\n".join(f"[{i+1}] ({item.get('category') or ''}) {item.get('title') or ''}\n{item['content']}".strip() for i, item in enumerate(relevant))
             return context_str, relevant, routing_info
 
         return None, [], routing_info
 
-    def ask(self, message: str, use_embedding=True, embedding_algorithm="cosine", category=None, top_k=3) -> str:
+    def ask(self, message: str, use_embedding=True, embedding_algorithm="cosine", categories=None, top_k=3) -> str:
         messages = []
         if self.prompt:
             messages.append({"role": "system", "content": self.prompt.prompt})
 
-        extra_context, _, _ = self._retrieve_context(message=message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, category=category, top_k=top_k)
+        extra_context, _, _ = self._retrieve_context(message=message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, categories=categories, top_k=top_k)
         if extra_context:
             messages.append({"role": "system", "content": f"Reference Context:\n{extra_context}"})
 
@@ -467,17 +502,17 @@ class GPTSessionService:
         response = self.client.chat.completions.create(model=self.model, messages=messages, temperature=0.7)
         return response.choices[0].message.content
 
-    def stream(self, message: str, use_embedding=True, embedding_algorithm="cosine", category=None, top_k=3):
+    def stream(self, message: str, use_embedding=True, embedding_algorithm="cosine", categories=None, top_k=3):
         messages = []
         if self.prompt:
             messages.append({"role": "system", "content": self.prompt.prompt})
 
-        extra_context, relevant, routing_info = self._retrieve_context(message=message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, category=category, top_k=top_k)
+        extra_context, relevant, routing_info = self._retrieve_context(message=message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, categories=categories, top_k=top_k)
         if use_embedding:
             yield f"event: routing\ndata: {json.dumps(routing_info, ensure_ascii=False)}\n\n"
 
         if relevant:
-            yield f"event: context\ndata: {json.dumps({'category': routing_info.get('category'), 'relevant_contexts': relevant, 'algorithm': embedding_algorithm}, ensure_ascii=False)}\n\n"
+            yield f"event: context\ndata: {json.dumps({'categories': routing_info.get('categories', []), 'relevant_contexts': relevant, 'algorithm': embedding_algorithm}, ensure_ascii=False)}\n\n"
 
         if extra_context:
             messages.append({"role": "system", "content": f"Reference Context:\n{extra_context}"})

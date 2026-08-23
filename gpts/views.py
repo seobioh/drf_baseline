@@ -119,10 +119,10 @@ class GPTChatMessageAPIView(APIView):
 
             use_embedding = request.data.get("use_embedding", True)
             embedding_algorithm = request.data.get("embedding_algorithm", "cosine")
-            category = request.data.get("category")
+            categories = request.data.get("categories")
             top_k = request.data.get("top_k", 3)
 
-            response = StreamingHttpResponse(gpt_service.stream(serializer.instance, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, category=category, top_k=top_k), content_type='text/event-stream')
+            response = StreamingHttpResponse(gpt_service.stream(serializer.instance, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, categories=categories, top_k=top_k), content_type='text/event-stream')
             response['Cache-Control'] = 'no-cache'
             response['X-Accel-Buffering'] = 'no'
             return response
@@ -141,7 +141,7 @@ class GPTStartAPIView(APIView):
         model = request.data.get("model", "gpt-4o-mini")
         use_embedding = request.data.get("use_embedding", True)
         embedding_algorithm = request.data.get("embedding_algorithm", "cosine")
-        category = request.data.get("category")
+        categories = request.data.get("categories")
         top_k = request.data.get("top_k", 3)
 
         prompt = None
@@ -152,7 +152,7 @@ class GPTStartAPIView(APIView):
         user_msg = GPTChatMessage.objects.create(chat_room=chat_room, role="user", model=model, message=message)
         gpt_service = GPTService(chat_room)
 
-        response = StreamingHttpResponse(gpt_service.stream_with_init(user_msg, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, category=category, top_k=top_k), content_type="text/event-stream")
+        response = StreamingHttpResponse(gpt_service.stream_with_init(user_msg, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, categories=categories, top_k=top_k), content_type="text/event-stream")
         response['Cache-Control'] = 'no-cache'
         response['X-Accel-Buffering'] = 'no'
         return response
@@ -168,7 +168,7 @@ class GPTSessionAPIView(APIView):
         model = request.data.get("model", "gpt-4o-mini")
         use_embedding = request.data.get("use_embedding", True)
         embedding_algorithm = request.data.get("embedding_algorithm", "cosine")
-        category = request.data.get("category")
+        categories = request.data.get("categories")
         top_k = request.data.get("top_k", 3)
 
         prompt = None
@@ -176,7 +176,7 @@ class GPTSessionAPIView(APIView):
             prompt = get_object_or_404(GPTPrompt, id=prompt_id, is_active=True)
 
         gpt_session_service = GPTSessionService(model=model, prompt=prompt)
-        response = StreamingHttpResponse(gpt_session_service.stream(message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, category=category, top_k=top_k), content_type="text/event-stream")
+        response = StreamingHttpResponse(gpt_session_service.stream(message, use_embedding=use_embedding, embedding_algorithm=embedding_algorithm, categories=categories, top_k=top_k), content_type="text/event-stream")
         response['Cache-Control'] = 'no-cache'
         response['X-Accel-Buffering'] = 'no'
         return response
